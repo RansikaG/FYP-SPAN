@@ -215,7 +215,7 @@ def train(image_root, mask_root, csv_file, model, device, checkpoint_path, epoch
 
         inv = T.Compose([T.Normalize(mean=[0.,0.,0.], std=[1/0.229,1/0.224,1/0.225]),
                          T.Normalize(mean=[-0.485,-0.456,-0.406 ], std=[1.,1.,1.])])
-        data, mask, view = iter(validloader).next()
+        data, mask, view = next(iter(validloader))
         pred = model(data.to(device))
         data = [inv(x).permute(1,2,0).cpu().detach().numpy() for x in data]
         view = view.detach().numpy()
