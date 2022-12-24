@@ -1,13 +1,17 @@
-import argparse
+import glob
 import glob
 import os
+
 import torch
-from resnet import resnet34
-from PIL import Image, ImageOps
-from CPDM import CPDM
-from torchvision import transforms
+from PIL import Image
 from torch.utils.data import Dataset, DataLoader
+from torchsummary import summary
+from torchvision import transforms
 from tqdm import tqdm
+
+import model
+from CPDM import CPDM
+from resnet import CNN1, CNN2
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -30,9 +34,12 @@ class ImageAndMasks(Dataset):
         self.filenames = glob.glob(os.path.join(image_root, '*.jpg'))
         self.len = len(self.filenames)
 
-    def __getitem__(self, index):
-        image = Image.open(self.filenames[index]).resize((192,192))
-        image = ImageOps.grayscale(image)
+    def __getitem__(self, index, masks_ready=True):
+        image = Image.open(self.filenames[index]).resize((192, 192))
+        # image = ImageOps.grayscale(image)
+        convert_tensor = transforms.Compose([transforms.Resize([192, 192]), transforms.ToTensor()])
+        transform_mask = transforms.Compose([transforms.Resize([24, 24]), transforms.ToTensor()])
+
         front_mask = Image.open(
             self.filenames[index].replace(self.image_root, self.mask_root).replace('.jpg', '_front.jpg'))
         rear_mask = Image.open(
@@ -41,18 +48,19 @@ class ImageAndMasks(Dataset):
             self.filenames[index].replace(self.image_root, self.mask_root).replace('.jpg', '_side.jpg'))
         # mask = np.array(mask.resize((60, 60)))
         # mask = torch.from_numpy(mask / 255).float()
-        convert_tensor = transforms.ToTensor()
 
-        return convert_tensor(image), convert_tensor(front_mask), convert_tensor(rear_mask),\
-            convert_tensor(side_mask)
+        return convert_tensor(image), transform_mask(front_mask), transform_mask(rear_mask), transform_mask(side_mask)
 
     def __len__(self):
         return self.len
 
 
 if __name__ == '__main__':
-    model = resnet34().to(device)
-    model.eval()
+    CNN1 = CNN1().to(device)
+    CNN1.eval()
+
+    CNN2 = CNN2().to(device)
+    CNN2.eval()
 
     # transform = T.Compose([T.Resize([192, 192]),
     #                        T.ToTensor(),
@@ -60,16 +68,31 @@ if __name__ == '__main__':
 
     dataset = ImageAndMasks(image_root=img_root, mask_root=mask_root)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
+    # dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=2, prefetch_factor=2, persistent_workers=True)
 
     with torch.no_grad():
         pbar = tqdm(total=len(dataloader))
         for _, data in enumerate(dataloader):
             image, front_mask, rear_mask, side_mask = data
-            print("image size: {}\n front: {}\n rear: {}\n side: {}\n".format(image.size(), front_mask.size(),
-                                                                              rear_mask.size(), side_mask.size()))
-            # masks = model(data.to(device))
-            # masks = masks.detach().cpu().numpy()
-            # for idx, mask in enumerate(masks):
-            #     cv2.imwrite(filenames[idx].replace(image_root, mask_root), mask * 255)
+
+            stage_1_CNN = CNN1(image.to(device))
+
+            front_image = torch.mul(stage_1_CNN, front_mask.to(device))
+            rear_image = torch.mul(stage_1_CNN, rear_mask.to(device))
+            side_image = torch.mul(stage_1_CNN, side_mask.to(device))
+
+            global_features = CNN2(stage_1_CNN)
+            front_features = CNN2(front_image)
+            rear_features = CNN2(rear_image)
+            side_features = CNN2(side_image)
+
+            print(f'image size: {image.size()}\n front: {front_mask.size()}\n rear: {rear_mask.size()}\n'
+                  f' side: {side_mask.size()}\n CNN1: {stage_1_CNN.size()}\n global_features: {global_features.size()}')
+
             pbar.update(1)
         pbar.close()
+    # print(summary(CNN1, (3, 192, 192)))
+    # print(summary(CNN2, (1024, 24, 24)))
+    # mask_generator = model.PartAtt_Generator().to(device)
+    # mask_generator.eval()
+    # mask_generator.load_state_dict(torch.load('./PartAttMask_ckpt/10.ckpt'))
