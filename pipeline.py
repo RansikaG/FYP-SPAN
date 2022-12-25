@@ -1,4 +1,3 @@
-import torch.optim as optim
 import numpy as np
 import pandas as pd
 import torch
@@ -9,7 +8,6 @@ from tqdm import tqdm
 
 import model
 from ImageMasksDataset import ImageMasksTriplet
-from resnet import CNN1, CNN2
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -52,11 +50,6 @@ class TripletLossWithCPDM(nn.Module):
 
 
 if __name__ == '__main__':
-    CNN1 = CNN1().to(device)
-    CNN1.eval()
-
-    CNN2 = CNN2().to(device)
-    CNN2.eval()
 
     # transform = T.Compose([T.Resize([192, 192]),
     #                        T.ToTensor(),
@@ -66,7 +59,9 @@ if __name__ == '__main__':
     train_data_path = './test_images/identities_train'
     mask_path = './PartAttMask/image_train'
 
-    dataframe = pd.read_csv(csv_path)
+    types_dict = {'filename': str, 'id': str, 'global': float, 'front': float, 'rear': float, 'side': float}
+    dataframe = pd.read_csv(csv_path, dtype=types_dict)
+    dataframe['area_ratios'] = dataframe[['global', 'front', 'rear', 'side']].values.tolist()
 
     dataset = ImageMasksTriplet(df=dataframe, image_path=train_data_path, mask_path=mask_path)
     # dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
@@ -74,6 +69,8 @@ if __name__ == '__main__':
                             persistent_workers=True)
 
     model = model.Second_Stage_Extractor()
+    if torch.cuda.is_available():
+        model.cuda()
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
     epoch = 2
     for ep in range(epoch):
@@ -82,16 +79,16 @@ if __name__ == '__main__':
         pbar = tqdm(total=len(dataloader))
         for batch_idx, data in enumerate(dataloader):
             anchor_img, anchor_image_masks, anchor_area_ratios, positive_img, \
-            positive_img_masks, positive_area_ratios, negative_img, negative_img_masks,\
-            negative_area_ratios, anchor_label = data.to(device)
+            positive_img_masks, positive_area_ratios, negative_img, negative_img_masks, \
+            negative_area_ratios, anchor_label = data
 
-            anchor_img_features = model(anchor_img, anchor_image_masks)
-            positive_img_features = model(positive_img, positive_img_masks)
-            negative_img_features = model(negative_img, negative_img_masks)
+            anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device), anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
+            positive_img_features = model(positive_img.to(device), positive_img_masks[0].to(device), positive_img_masks[1].to(device), positive_img_masks[2].to(device))
+            negative_img_features = model(negative_img.to(device), negative_img_masks[0].to(device),negative_img_masks[1].to(device), negative_img_masks[2].to(device))
 
             criterion = TripletLossWithCPDM()
-            loss = criterion(anchor_img_features, anchor_area_ratios, positive_img_features,
-                            positive_area_ratios, negative_img_features, negative_area_ratios)
+            loss = criterion(anchor_img_features, anchor_area_ratios.to(device), positive_img_features,
+                             positive_area_ratios.to(device), negative_img_features, negative_area_ratios.to(device))
             # loss = loss_mask + loss_area + loss_div
             optimizer.zero_grad()
             loss.backward()
@@ -101,10 +98,8 @@ if __name__ == '__main__':
             pbar.update(1)
         pbar.close()
 
-
-
-            # print(f'image size: {image.size()}\n front: {front_mask.size()}\n rear: {rear_mask.size()}\n'
-            #       f' side: {side_mask.size()}\n CNN1: {stage_1_CNN.size()}\n global_features: {global_features.size()}')
+        # print(f'image size: {image.size()}\n front: {front_mask.size()}\n rear: {rear_mask.size()}\n'
+        #       f' side: {side_mask.size()}\n CNN1: {stage_1_CNN.size()}\n global_features: {global_features.size()}')
     # print(summary(CNN1, (3, 192, 192)))
     # print(summary(CNN2, (1024, 24, 24)))
     # mask_generator = model.PartAtt_Generator().to(device)
