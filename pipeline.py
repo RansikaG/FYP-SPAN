@@ -26,9 +26,10 @@ class TripletLossWithCPDM(nn.Module):
         self.part_feature_size = part_feature_size
 
     def calc_euclidean(self, x1, x1_area_ratio, x2, x2_area_ratio):
-        cam = x1_area_ratio * x2_area_ratio
+        cam = np.array(x1_area_ratio) * np.array(x2_area_ratio)
         # print(cam)
-        normalized_cam = cam / np.sum(cam)
+        normalized_cam = cam / np.sum(cam, axis=1, keepdims=True)
+        normalized_cam = torch.from_numpy(normalized_cam).float().to(device)
         distance = (x1 - x2).pow(2).sum(1)
         weighted_distance = np.concatenate((distance[:self.global_feature_size] * normalized_cam[0],
                                             distance[
@@ -82,13 +83,16 @@ if __name__ == '__main__':
             positive_img_masks, positive_area_ratios, negative_img, negative_img_masks, \
             negative_area_ratios, anchor_label = data
 
-            anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device), anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
-            positive_img_features = model(positive_img.to(device), positive_img_masks[0].to(device), positive_img_masks[1].to(device), positive_img_masks[2].to(device))
-            negative_img_features = model(negative_img.to(device), negative_img_masks[0].to(device),negative_img_masks[1].to(device), negative_img_masks[2].to(device))
+            anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device),
+                                        anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
+            positive_img_features = model(positive_img.to(device), positive_img_masks[0].to(device),
+                                          positive_img_masks[1].to(device), positive_img_masks[2].to(device))
+            negative_img_features = model(negative_img.to(device), negative_img_masks[0].to(device),
+                                          negative_img_masks[1].to(device), negative_img_masks[2].to(device))
 
             criterion = TripletLossWithCPDM()
-            loss = criterion(anchor_img_features, anchor_area_ratios.to(device), positive_img_features,
-                             positive_area_ratios.to(device), negative_img_features, negative_area_ratios.to(device))
+            loss = criterion(anchor_img_features, anchor_area_ratios, positive_img_features,
+                             positive_area_ratios, negative_img_features, negative_area_ratios)
             # loss = loss_mask + loss_area + loss_div
             optimizer.zero_grad()
             loss.backward()

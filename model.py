@@ -96,12 +96,12 @@ class Second_Stage_Extractor(nn.Module):
         self.stage1_extractor = CNN1().eval()  # we don't train the stage 1 extractor
         self.stage2_extractor_global = CNN2(num_features=1024)
         self.stage2_extractor_front = CNN2()
-        self.stage2_extractor_rear = Generator_Block()
-        self.stage2_extractor_side = Generator_Block()
+        self.stage2_extractor_rear = CNN2()
+        self.stage2_extractor_side = CNN2()
 
-    def forward(self, image, image_masks):
+    def forward(self, image, front_mask, rear_mask, side_mask):
         # masks should be 24x24
-        front_mask, rear_mask, side_mask = image_masks
+        # front_mask, rear_mask, side_mask = image_masks
 
         global_stage_1 = self.stage1_extractor(image)
         front_image = torch.mul(global_stage_1, front_mask)
@@ -112,4 +112,4 @@ class Second_Stage_Extractor(nn.Module):
         front_features = self.stage2_extractor_front(front_image)
         rear_features = self.stage2_extractor_rear(rear_image)
         side_features = self.stage2_extractor_side(side_image)
-        return torch.cat((global_features, front_features, rear_features, side_features))
+        return torch.cat((global_features, front_features, rear_features, side_features),dim=1)
