@@ -27,19 +27,15 @@ class TripletLossWithCPDM(nn.Module):
 
     def calc_euclidean(self, x1, x1_area_ratio, x2, x2_area_ratio):
         cam = np.array(x1_area_ratio) * np.array(x2_area_ratio)
-        # print(cam)
         normalized_cam = cam / np.sum(cam, axis=1, keepdims=True)
         normalized_cam = torch.from_numpy(normalized_cam).float().to(device)
-        distance = (x1 - x2).pow(2).sum(1)
-        weighted_distance = np.concatenate((distance[:self.global_feature_size] * normalized_cam[0],
-                                            distance[
-                                            self.global_feature_size: self.global_feature_size + self.part_feature_size] *
-                                            normalized_cam[1],
-                                            distance[
-                                            self.global_feature_size + self.part_feature_size: self.global_feature_size + 2 * self.part_feature_size] *
-                                            normalized_cam[2],
-                                            distance[self.global_feature_size + 2 * self.part_feature_size:] *
-                                            normalized_cam[3]))
+        distance = (x1 - x2).pow(2)
+        global_distance = distance[:,:self.global_feature_size]*normalized_cam[:,0:1]
+        front_distance = distance[:,self.global_feature_size: self.global_feature_size + self.part_feature_size]*normalized_cam[:,1:2]
+        rear_distance = distance[:,self.global_feature_size + self.part_feature_size: self.global_feature_size + 2 * self.part_feature_size]* normalized_cam[:,2:3]
+        side_distance = distance[:,self.global_feature_size + 2 * self.part_feature_size:]* normalized_cam[:,3:]
+
+        weighted_distance = torch.cat((global_distance, front_distance, rear_distance, side_distance), 1).sum(1)
         return weighted_distance
 
     def forward(self, anchor, anchor_area_ratio, positive, positive_area_ratio, negative, negative_area_ratio):
