@@ -3,7 +3,7 @@ import torch.nn as nn
 import math
 from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
-__all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']
+__all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'CNN1', 'CNN2']
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -228,7 +228,7 @@ def CNN1(pretrained=True):
     return cnn1
 
 
-def CNN2(pretrained=True):
+def CNN2(pretrained=True, num_features = 512):
     model = ResNet(Bottleneck, [3, 4, 6, 3])
     if pretrained:
         model.load_param(load_state_dict_from_url(model_urls['resnet50']))
@@ -239,5 +239,5 @@ def CNN2(pretrained=True):
 
     # Parameters of newly constructed modules have requires_grad=True by default
     flatten = nn.Flatten()
-    cnn2 = nn.Sequential(cnn2, flatten, nn.Linear(2048*12*12, 512))
+    cnn2 = nn.Sequential(cnn2, flatten, nn.Linear(2048*12*12, num_features))
     return cnn2

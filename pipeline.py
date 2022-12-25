@@ -2,8 +2,10 @@ import glob
 import glob
 import os
 
+import numpy as np
 import torch
 from PIL import Image
+from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from torchsummary import summary
 from torchvision import transforms
@@ -34,7 +36,7 @@ class ImageAndMasks(Dataset):
         self.filenames = glob.glob(os.path.join(image_root, '*.jpg'))
         self.len = len(self.filenames)
 
-    def __getitem__(self, index, masks_ready=True):
+    def __getitem__(self, index):
         image = Image.open(self.filenames[index]).resize((192, 192))
         # image = ImageOps.grayscale(image)
         convert_tensor = transforms.Compose([transforms.Resize([192, 192]), transforms.ToTensor()])
@@ -55,6 +57,32 @@ class ImageAndMasks(Dataset):
         return self.len
 
 
+class TripletLossWithCPDM(nn.Module):
+    def __init__(self, margin=1.0, global_feature_size = 1024, part_feature_size = 512):
+        super(TripletLossWithCPDM, self).__init__()
+        self.margin = margin
+        self.global_feature_size = global_feature_size
+        self.part_feature_size = part_feature_size
+
+    def calc_euclidean(self, x1, x1_area_ratio, x2, x2_area_ratio):
+        cam = x1_area_ratio * x2_area_ratio
+        # print(cam)
+        normalized_cam = cam / np.sum(cam)
+        distance = (x1 - x2).pow(2).sum(1)
+        weighted_distance = np.concatenate((distance[:self.global_feature_size]*normalized_cam[0],
+             distance[self.global_feature_size: self.global_feature_size+self.part_feature_size]*normalized_cam[1],
+             distance[self.global_feature_size+self.part_feature_size: self.global_feature_size+2*self.part_feature_size]*normalized_cam[2],
+             distance[self.global_feature_size+2*self.part_feature_size:]*normalized_cam[3]))
+        return weighted_distance
+
+    def forward(self, anchor, anchor_area_ratio, positive, positive_area_ratio, negative, negative_area_ratio):
+        distance_positive = self.calc_euclidean(anchor, positive)
+        distance_negative = self.calc_euclidean(anchor, negative)
+        losses = torch.relu(distance_positive - distance_negative + self.margin)
+
+        return losses.mean()
+
+
 if __name__ == '__main__':
     CNN1 = CNN1().to(device)
     CNN1.eval()
@@ -73,7 +101,7 @@ if __name__ == '__main__':
     with torch.no_grad():
         pbar = tqdm(total=len(dataloader))
         for _, data in enumerate(dataloader):
-            image, front_mask, rear_mask, side_mask = data
+            image, front_mask, rear_mask, side_mask = data.to(device)
 
             stage_1_CNN = CNN1(image.to(device))
 
