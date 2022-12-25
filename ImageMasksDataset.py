@@ -31,7 +31,7 @@ class ImageMasksTriplet(Dataset):
         anchor_image_name = self.images[item]
         anchor_image_path = self.img_path + '/' + self.labels[item] + '/' + anchor_image_name
 
-        anchor_img = Image.open(anchor_image_path).convert('RGB')
+        anchor_img = self.img_transform(Image.open(anchor_image_path).convert('RGB'))
         anchor_label = self.labels[item]
         anchor_area_ratios = self.area_ratios[item]
         anchor_image_masks = self.get_masks(anchor_image_name)
@@ -39,7 +39,7 @@ class ImageMasksTriplet(Dataset):
             positive_list = self.index[self.index != item][self.labels[self.index != item] == anchor_label]
             positive_item = random.choice(positive_list)
             positive_image_name = self.images[positive_item]
-            positive_image_path = self.img_path + '/' + self.labels[item] + '/' + + positive_image_name
+            positive_image_path = self.img_path + '/' + self.labels[positive_item] + '/' + positive_image_name
             positive_img = self.img_transform(Image.open(positive_image_path).convert('RGB'))
             positive_img_masks = self.get_masks(positive_image_name)
             positive_area_ratios = self.area_ratios[positive_item]
@@ -47,7 +47,7 @@ class ImageMasksTriplet(Dataset):
             negative_list = self.index[self.index != item][self.labels[self.index != item] != anchor_label]
             negative_item = random.choice(negative_list)
             negative_image_name = self.images[negative_item]
-            negative_image_path = self.img_path + '/' + self.labels[item] + '/' + + negative_image_name
+            negative_image_path = self.img_path + '/' + self.labels[negative_item] + '/' + negative_image_name
             negative_img = self.img_transform(Image.open(negative_image_path).convert('RGB'))
             negative_img_masks = self.get_masks(negative_image_name)
             negative_area_ratios = self.area_ratios[negative_item]
