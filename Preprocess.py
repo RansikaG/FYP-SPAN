@@ -46,3 +46,5 @@ def create_csv_with_area_ratios(image_path, mask_path, csv_path):
 if __name__ == '__main__':
     create_csv_with_area_ratios(image_path='./test_images/identities_train', mask_path='./PartAttMask/image_train',
                                 csv_path='./test_images/identities_train')
+
+    csv_path = 'test_images/identities_train/train_data.csv'
