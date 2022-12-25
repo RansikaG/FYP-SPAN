@@ -99,8 +99,10 @@ class Second_Stage_Extractor(nn.Module):
         self.stage2_extractor_rear = Generator_Block()
         self.stage2_extractor_side = Generator_Block()
 
-    def forward(self, image, front_mask, rear_mask, side_mask):
+    def forward(self, image, image_masks):
         # masks should be 24x24
+        front_mask, rear_mask, side_mask = image_masks
+
         global_stage_1 = self.stage1_extractor(image)
         front_image = torch.mul(global_stage_1, front_mask)
         rear_image = torch.mul(global_stage_1, rear_mask)
