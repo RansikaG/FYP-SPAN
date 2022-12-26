@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 import pandas as pd
+import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
@@ -35,6 +36,9 @@ class ImageMasksTriplet(Dataset):
 
         anchor_img = self.img_transform(Image.open(anchor_image_path).convert('RGB'))
         anchor_label = self.labels[item]
+
+        target = int(anchor_label)
+
         anchor_area_ratios = np.array(self.area_ratios[item])
         anchor_image_masks = self.get_masks(anchor_image_name)
         if self.is_train:
@@ -55,9 +59,9 @@ class ImageMasksTriplet(Dataset):
             negative_area_ratios = np.array(self.area_ratios[negative_item])
 
             return anchor_img, anchor_image_masks, anchor_area_ratios, positive_img, positive_img_masks, \
-                   positive_area_ratios, negative_img, negative_img_masks, negative_area_ratios, anchor_label
+                   positive_area_ratios, negative_img, negative_img_masks, negative_area_ratios, target
         else:
-            return anchor_img, anchor_image_masks, anchor_area_ratios
+            return anchor_img, anchor_image_masks, anchor_area_ratios, target
 
     def get_masks(self, image_name):
         front_mask = self.mask_transform(Image.open(self.mask_path + '/' + image_name.replace('.jpg', '_front.jpg')))
@@ -75,4 +79,4 @@ if __name__ == '__main__':
     names = train_data['filename']
     train_data['area_ratios'] = train_data[['global', 'front', 'rear', 'side']].values.tolist()
 
-    print(train_data.index.values)
+    print(train_data.index.dtype)
