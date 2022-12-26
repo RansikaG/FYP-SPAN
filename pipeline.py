@@ -98,10 +98,3 @@ if __name__ == '__main__':
             pbar.update(1)
         pbar.close()
 
-        # print(f'image size: {image.size()}\n front: {front_mask.size()}\n rear: {rear_mask.size()}\n'
-        #       f' side: {side_mask.size()}\n CNN1: {stage_1_CNN.size()}\n global_features: {global_features.size()}')
-    # print(summary(CNN1, (3, 192, 192)))
-    # print(summary(CNN2, (1024, 24, 24)))
-    # mask_generator = model.PartAtt_Generator().to(device)
-    # mask_generator.eval()
-    # mask_generator.load_state_dict(torch.load('./PartAttMask_ckpt/10.ckpt'))
