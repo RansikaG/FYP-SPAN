@@ -112,4 +112,20 @@ class Second_Stage_Extractor(nn.Module):
         front_features = self.stage2_extractor_front(front_image)
         rear_features = self.stage2_extractor_rear(rear_image)
         side_features = self.stage2_extractor_side(side_image)
-        return torch.cat((global_features, front_features, rear_features, side_features),dim=1)
+        return torch.cat((global_features, front_features, rear_features, side_features), dim=1)
+
+
+class BoatIDClassifier(nn.Module):
+    def __init__(self, input_size=2560, num_of_classes=100):
+        super(BoatIDClassifier, self).__init__()
+        self.input_size = input_size
+        self.num_classes = num_of_classes
+        self.batchNorm = nn.BatchNorm1d(self.input_size)
+        self.fc = nn.Linear(self.input_size, self.num_classes)
+
+    def forward(self, features):
+        # features should be of size 2560 = 1024 + 512 + 512 + 512
+        out = self.batchNorm(features)
+        out = self.fc(out)
+        # No softmax since softmax is applied in the cross entropy loss
+        return out

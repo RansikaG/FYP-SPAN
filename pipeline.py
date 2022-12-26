@@ -30,10 +30,15 @@ class TripletLossWithCPDM(nn.Module):
         normalized_cam = cam / np.sum(cam, axis=1, keepdims=True)
         normalized_cam = torch.from_numpy(normalized_cam).float().to(device)
         distance = (x1 - x2).pow(2)
-        global_distance = distance[:,:self.global_feature_size]*normalized_cam[:,0:1]
-        front_distance = distance[:,self.global_feature_size: self.global_feature_size + self.part_feature_size]*normalized_cam[:,1:2]
-        rear_distance = distance[:,self.global_feature_size + self.part_feature_size: self.global_feature_size + 2 * self.part_feature_size]* normalized_cam[:,2:3]
-        side_distance = distance[:,self.global_feature_size + 2 * self.part_feature_size:]* normalized_cam[:,3:]
+        global_distance = distance[:, :self.global_feature_size] * normalized_cam[:, 0:1]
+        front_distance = distance[:,
+                         self.global_feature_size: self.global_feature_size + self.part_feature_size] * normalized_cam[
+                                                                                                        :, 1:2]
+        rear_distance = distance[:,
+                        self.global_feature_size + self.part_feature_size: self.global_feature_size + 2 * self.part_feature_size] * normalized_cam[
+                                                                                                                                    :,
+                                                                                                                                    2:3]
+        side_distance = distance[:, self.global_feature_size + 2 * self.part_feature_size:] * normalized_cam[:, 3:]
 
         weighted_distance = torch.cat((global_distance, front_distance, rear_distance, side_distance), 1).sum(1)
         return weighted_distance
@@ -65,9 +70,12 @@ if __name__ == '__main__':
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
                             persistent_workers=True)
 
+    classifier = model.BoatIDClassifier(num_of_classes=5)
     model = model.Second_Stage_Extractor()
+
     if torch.cuda.is_available():
         model.cuda()
+        classifier.cuda()
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
     epoch = 2
     for ep in range(epoch):
@@ -77,7 +85,7 @@ if __name__ == '__main__':
         for batch_idx, data in enumerate(dataloader):
             anchor_img, anchor_image_masks, anchor_area_ratios, positive_img, \
             positive_img_masks, positive_area_ratios, negative_img, negative_img_masks, \
-            negative_area_ratios, anchor_label = data
+            negative_area_ratios, target = data
 
             anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device),
                                         anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
@@ -86,10 +94,18 @@ if __name__ == '__main__':
             negative_img_features = model(negative_img.to(device), negative_img_masks[0].to(device),
                                           negative_img_masks[1].to(device), negative_img_masks[2].to(device))
 
-            criterion = TripletLossWithCPDM()
-            loss = criterion(anchor_img_features, anchor_area_ratios, positive_img_features,
-                             positive_area_ratios, negative_img_features, negative_area_ratios)
-            # loss = loss_mask + loss_area + loss_div
+            prediction = classifier(anchor_img_features)
+            criterion1 = nn.CrossEntropyLoss()
+            criterion2 = TripletLossWithCPDM()
+
+            cross_entropy_loss = criterion1(prediction, target.to(device))
+            triplet_loss = criterion2(anchor_img_features, anchor_area_ratios, positive_img_features,
+                                      positive_area_ratios, negative_img_features, negative_area_ratios)
+
+            lambda_ID = 1
+            lambda_triplet = 1
+            loss = lambda_ID * cross_entropy_loss + lambda_triplet * triplet_loss
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -97,4 +113,3 @@ if __name__ == '__main__':
             pbar.set_postfix({'Triplet_loss': ' {0:1.3f}'.format(loss / (batch_idx + 1))})
             pbar.update(1)
         pbar.close()
-
