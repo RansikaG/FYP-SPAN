@@ -1,13 +1,14 @@
+import os
+
 import numpy as np
 import pandas as pd
 import torch
-import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import model
-from ImageMasksDataset import ImageMasksTriplet
+from ImageMasksDataset import ImageAndMasksFeatures
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -16,7 +17,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 img_root = "./test_images/image_test"
 mask_root = "./PartAttMask/image_test"
-
 
 
 class TripletLossWithCPDM(nn.Module):
@@ -61,15 +61,15 @@ if __name__ == '__main__':
     csv_path = 'test_images/identities_train/train_data.csv'
     train_data_path = './test_images/identities_train'
     mask_path = './PartAttMask/image_train'
+    feature_tensor_save_path = './test_images/identities_train/features'
 
     types_dict = {'filename': str, 'id': str, 'global': float, 'front': float, 'rear': float, 'side': float}
     dataframe = pd.read_csv(csv_path, dtype=types_dict)
     dataframe['area_ratios'] = dataframe[['global', 'front', 'rear', 'side']].values.tolist()
 
-    dataset = ImageMasksTriplet(df=dataframe, image_path=train_data_path, mask_path=mask_path)
+    dataset = ImageAndMasksFeatures(df=dataframe, image_path=train_data_path, mask_path=mask_path)
     # dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
-                            persistent_workers=True)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     # classifier = model.BoatIDClassifier(num_of_classes=5)
     model = model.Second_Stage_Resnet50_Features()
@@ -79,30 +79,40 @@ if __name__ == '__main__':
         # classifier.cuda()
     # optimizer = optim.Adam(model.parameters(), lr=0.0001)
     activation = {}
+
+
     def get_activation(name):
         def hook(model, image, output):
             activation[name] = output.detach()
+
         return hook
+
 
     model.stage2_features_global.register_forward_hook(get_activation('global'))
     model.stage2_features_front.register_forward_hook(get_activation('front'))
     model.stage2_features_rear.register_forward_hook(get_activation('rear'))
     model.stage2_features_side.register_forward_hook(get_activation('side'))
 
-
     model.eval()
     pbar = tqdm(total=len(dataloader))
+
+    if not os.path.isdir(feature_tensor_save_path):
+        os.mkdir(feature_tensor_save_path)
     for batch_idx, data in enumerate(dataloader):
-        anchor_img, anchor_image_masks, _, _, _, _, _, _, _, _ = data
+        img, image_masks, img_name = data
 
-        anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device),
-                                    anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
+        img_features = model(img.to(device), image_masks[0].to(device),
+                             image_masks[1].to(device), image_masks[2].to(device))
 
-        print(activation['global'].shape)
-        print(activation['front'].shape)
-        print(activation['rear'].shape)
-        print(activation['side'].shape)
+        global_features = activation['global']
+        front_features = activation['front']
+        rear_features = activation['rear']
+        side_features = activation['side']
 
-        pbar.set_postfix({'Batch no': ' {}'.format(batch_idx + 1)})
+        torch.save(global_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_global.pt'))
+        torch.save(front_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_front.pt'))
+        torch.save(rear_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_rear.pt'))
+        torch.save(side_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_side.pt'))
+        pbar.set_postfix({'Img no': ' {}'.format(batch_idx + 1)})
         pbar.update(1)
     pbar.close()

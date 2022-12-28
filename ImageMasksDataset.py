@@ -70,6 +70,35 @@ class ImageMasksTriplet(Dataset):
         return front_mask, rear_mask, side_mask
 
 
+class ImageAndMasksFeatures(Dataset):
+    def __init__(self, df, image_path, mask_path):
+        self.data_csv = df
+        self.img_transform = transforms.Compose([transforms.Resize([192, 192]), transforms.ToTensor()])
+        self.mask_transform = transforms.Compose([transforms.Resize([24, 24]), transforms.ToTensor()])
+        self.img_path = image_path
+        self.mask_path = mask_path
+        self.images = df['filename'].values
+        self.labels = df['id'].values
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, item):
+        image_name = self.images[item]
+        image_path = self.img_path + '/' + self.labels[item] + '/' + image_name
+
+        img = self.img_transform(Image.open(image_path).convert('RGB'))
+        image_masks = self.get_masks(image_name)
+
+        return img, image_masks, image_name
+
+    def get_masks(self, image_name):
+        front_mask = self.mask_transform(Image.open(self.mask_path + '/' + image_name.replace('.jpg', '_front.jpg')))
+        rear_mask = self.mask_transform(Image.open(self.mask_path + '/' + image_name.replace('.jpg', '_rear.jpg')))
+        side_mask = self.mask_transform(Image.open(self.mask_path + '/' + image_name.replace('.jpg', '_side.jpg')))
+        return front_mask, rear_mask, side_mask
+
+
 if __name__ == '__main__':
     mask_path = './PartAttMask/image_train'
     csv_path = 'test_images/identities_train/train_data.csv'
