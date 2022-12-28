@@ -18,6 +18,7 @@ img_root = "./test_images/image_test"
 mask_root = "./PartAttMask/image_test"
 
 
+
 class TripletLossWithCPDM(nn.Module):
     def __init__(self, margin=1.0, global_feature_size=1024, part_feature_size=512):
         super(TripletLossWithCPDM, self).__init__()
@@ -70,46 +71,38 @@ if __name__ == '__main__':
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
                             persistent_workers=True)
 
-    classifier = model.BoatIDClassifier(num_of_classes=5)
-    model = model.Second_Stage_Extractor()
+    # classifier = model.BoatIDClassifier(num_of_classes=5)
+    model = model.Second_Stage_Resnet50_Features()
 
     if torch.cuda.is_available():
         model.cuda()
-        classifier.cuda()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-    epoch = 2
-    for ep in range(epoch):
-        model.train()
-        print('\nStarting epoch %d / %d :' % (ep + 1, epoch))
-        pbar = tqdm(total=len(dataloader))
-        for batch_idx, data in enumerate(dataloader):
-            anchor_img, anchor_image_masks, anchor_area_ratios, positive_img, \
-            positive_img_masks, positive_area_ratios, negative_img, negative_img_masks, \
-            negative_area_ratios, target = data
+        # classifier.cuda()
+    # optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    activation = {}
+    def get_activation(name):
+        def hook(model, image, output):
+            activation[name] = output.detach()
+        return hook
 
-            anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device),
-                                        anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
-            positive_img_features = model(positive_img.to(device), positive_img_masks[0].to(device),
-                                          positive_img_masks[1].to(device), positive_img_masks[2].to(device))
-            negative_img_features = model(negative_img.to(device), negative_img_masks[0].to(device),
-                                          negative_img_masks[1].to(device), negative_img_masks[2].to(device))
+    model.stage2_features_global.register_forward_hook(get_activation('global'))
+    model.stage2_features_front.register_forward_hook(get_activation('front'))
+    model.stage2_features_rear.register_forward_hook(get_activation('rear'))
+    model.stage2_features_side.register_forward_hook(get_activation('side'))
 
-            prediction = classifier(anchor_img_features)
-            criterion1 = nn.CrossEntropyLoss()
-            criterion2 = TripletLossWithCPDM()
 
-            cross_entropy_loss = criterion1(prediction, target.to(device))
-            triplet_loss = criterion2(anchor_img_features, anchor_area_ratios, positive_img_features,
-                                      positive_area_ratios, negative_img_features, negative_area_ratios)
+    model.eval()
+    pbar = tqdm(total=len(dataloader))
+    for batch_idx, data in enumerate(dataloader):
+        anchor_img, anchor_image_masks, _, _, _, _, _, _, _, _ = data
 
-            lambda_ID = 1
-            lambda_triplet = 1
-            loss = lambda_ID * cross_entropy_loss + lambda_triplet * triplet_loss
+        anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device),
+                                    anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        print(activation['global'].shape)
+        print(activation['front'].shape)
+        print(activation['rear'].shape)
+        print(activation['side'].shape)
 
-            pbar.set_postfix({'Triplet_loss': ' {0:1.3f}'.format(loss / (batch_idx + 1))})
-            pbar.update(1)
-        pbar.close()
+        pbar.set_postfix({'Batch no': ' {}'.format(batch_idx + 1)})
+        pbar.update(1)
+    pbar.close()

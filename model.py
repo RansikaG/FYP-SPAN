@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.transforms as T
-from resnet import resnet34, resnet50, CNN1, CNN2
+from resnet import resnet34, resnet50, CNN1, CNN2, resnet50_SecondHalf
 import math
 
 
@@ -112,6 +112,31 @@ class Second_Stage_Extractor(nn.Module):
         front_features = self.stage2_extractor_front(front_image)
         rear_features = self.stage2_extractor_rear(rear_image)
         side_features = self.stage2_extractor_side(side_image)
+        return torch.cat((global_features, front_features, rear_features, side_features), dim=1)
+
+
+class Second_Stage_Resnet50_Features(nn.Module):
+    def __init__(self):
+        super(Second_Stage_Resnet50_Features, self).__init__()
+        self.stage1_extractor = CNN1().eval()  # we don't train the stage 1 extractor
+        self.stage2_features_global = resnet50_SecondHalf().eval()
+        self.stage2_features_front = resnet50_SecondHalf().eval()
+        self.stage2_features_rear = resnet50_SecondHalf().eval()
+        self.stage2_features_side = resnet50_SecondHalf().eval()
+
+    def forward(self, image, front_mask, rear_mask, side_mask):
+        # masks should be 24x24
+        # front_mask, rear_mask, side_mask = image_masks
+
+        global_stage_1 = self.stage1_extractor(image)
+        front_image = torch.mul(global_stage_1, front_mask)
+        rear_image = torch.mul(global_stage_1, rear_mask)
+        side_image = torch.mul(global_stage_1, side_mask)
+
+        global_features = self.stage2_features_global(global_stage_1)
+        front_features = self.stage2_features_front(front_image)
+        rear_features = self.stage2_features_rear(rear_image)
+        side_features = self.stage2_features_side(side_image)
         return torch.cat((global_features, front_features, rear_features, side_features), dim=1)
 
 
