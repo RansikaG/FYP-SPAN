@@ -3,14 +3,15 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from torch import nn
+from torch import nn, optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import model
-from ImageMasksDataset import ImageAndMasksFeatures
+from ImageMasksDataset import ImageAndMasksFeatures, ImageFeatures
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+Train = True
 
 # parser = argparse.ArgumentParser(description='Train Semantics-guided Part Attention Network (SPAN) pipeline', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 # parser.add_argument('--mode', required=True, help='Select training or implementation mode; option: ["train", "implement"]')
@@ -67,17 +68,16 @@ if __name__ == '__main__':
     dataframe = pd.read_csv(csv_path, dtype=types_dict)
     dataframe['area_ratios'] = dataframe[['global', 'front', 'rear', 'side']].values.tolist()
 
-    dataset = ImageAndMasksFeatures(df=dataframe, image_path=train_data_path, mask_path=mask_path)
+    img_dataset = ImageAndMasksFeatures(df=dataframe, image_path=train_data_path, mask_path=mask_path)
     # dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+    img_dataloader = DataLoader(img_dataset, batch_size=1, shuffle=False)
 
     # classifier = model.BoatIDClassifier(num_of_classes=5)
-    model = model.Second_Stage_Resnet50_Features()
+    resnetExtractor = model.Second_Stage_Resnet50_Features()
 
     if torch.cuda.is_available():
-        model.cuda()
-        # classifier.cuda()
-    # optimizer = optim.Adam(model.parameters(), lr=0.0001)
+        resnetExtractor.cuda()
+
     activation = {}
 
 
@@ -88,22 +88,22 @@ if __name__ == '__main__':
         return hook
 
 
-    model.stage2_features_global.register_forward_hook(get_activation('global'))
-    model.stage2_features_front.register_forward_hook(get_activation('front'))
-    model.stage2_features_rear.register_forward_hook(get_activation('rear'))
-    model.stage2_features_side.register_forward_hook(get_activation('side'))
+    resnetExtractor.stage2_features_global.register_forward_hook(get_activation('global'))
+    resnetExtractor.stage2_features_front.register_forward_hook(get_activation('front'))
+    resnetExtractor.stage2_features_rear.register_forward_hook(get_activation('rear'))
+    resnetExtractor.stage2_features_side.register_forward_hook(get_activation('side'))
 
-    model.eval()
-    pbar = tqdm(total=len(dataloader))
+    resnetExtractor.eval()
+    pbar = tqdm(total=len(img_dataloader))
 
     print('#### preparing image features')
     if not os.path.isdir(feature_tensor_save_path):
         os.mkdir(feature_tensor_save_path)
-    for batch_idx, data in enumerate(dataloader):
+    for batch_idx, data in enumerate(img_dataloader):
         img, image_masks, img_name = data
 
-        img_features = model(img.to(device), image_masks[0].to(device),
-                             image_masks[1].to(device), image_masks[2].to(device))
+        img_features = resnetExtractor(img.to(device), image_masks[0].to(device),
+                                       image_masks[1].to(device), image_masks[2].to(device))
 
         global_features = activation['global']
         front_features = activation['front']
@@ -118,3 +118,51 @@ if __name__ == '__main__':
         pbar.set_postfix({'Img no': ' {}'.format(batch_idx + 1)})
         pbar.update(1)
     pbar.close()
+
+    print('#### Training #####')
+    if Train:
+        feature_dataset = ImageFeatures(df=dataframe, feature_path=feature_tensor_save_path, device=device)
+        feature_dataloader = DataLoader(img_dataset, batch_size=2, shuffle=False)
+
+        classifier = model.BoatIDClassifier(num_of_classes=5)
+        fc_model = model.FC_Features()
+
+        if torch.cuda.is_available():
+            fc_model.cuda()
+            classifier.cuda()
+        optimizer = optim.Adam(fc_model.parameters(), lr=0.0001)
+
+        epoch = 2
+
+        for ep in range(epoch):
+            fc_model.train()
+            classifier.train()
+            print('\nStarting epoch %d / %d :' % (ep + 1, epoch))
+            pbar = tqdm(total=len(feature_dataloader))
+            for batch_idx, data in enumerate(feature_dataloader):
+                anchor_raw_features, anchor_area_ratios, positive_raw_features, positive_area_ratios, \
+                negative_raw_features, negative_area_ratios, target = data
+
+                anchor_img_features = fc_model(anchor_raw_features)
+                positive_img_features = fc_model(positive_raw_features)
+                negative_img_features = fc_model(negative_raw_features)
+
+                prediction = classifier(anchor_img_features)
+                criterion1 = nn.CrossEntropyLoss()
+                criterion2 = TripletLossWithCPDM()
+
+                cross_entropy_loss = criterion1(prediction, target.to(device))
+                triplet_loss = criterion2(anchor_img_features, anchor_area_ratios, positive_img_features,
+                                          positive_area_ratios, negative_img_features, negative_area_ratios)
+
+                lambda_ID = 1
+                lambda_triplet = 1
+                loss = lambda_ID * cross_entropy_loss + lambda_triplet * triplet_loss
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                pbar.set_postfix({'Triplet_loss': ' {0:1.3f}'.format(loss / (batch_idx + 1))})
+                pbar.update(1)
+            pbar.close()
