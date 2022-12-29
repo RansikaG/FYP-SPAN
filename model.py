@@ -133,10 +133,36 @@ class Second_Stage_Resnet50_Features(nn.Module):
         rear_image = torch.mul(global_stage_1, rear_mask)
         side_image = torch.mul(global_stage_1, side_mask)
 
-        global_features = self.stage2_features_global(global_stage_1)
-        front_features = self.stage2_features_front(front_image)
-        rear_features = self.stage2_features_rear(rear_image)
-        side_features = self.stage2_features_side(side_image)
+        global_resnet_features = self.stage2_features_global(global_stage_1)
+        front_resnet_features = self.stage2_features_front(front_image)
+        rear_resnet_features = self.stage2_features_rear(rear_image)
+        side_resnet_features = self.stage2_features_side(side_image)
+        return torch.cat((global_resnet_features, front_resnet_features, rear_resnet_features, side_resnet_features), dim=1)
+
+
+class FC_Features(nn.Module):
+    def __init__(self, input_size=2560, global_size=1024, other_view_size=512):
+        super(FC_Features, self).__init__()
+        self.global_size = global_size
+        self.view_size = other_view_size
+        self.input_size = input_size
+        self.global_fc = nn.Linear(input_size, global_size)
+        self.front_fc = nn.Linear(input_size, other_view_size)
+        self.rear_fc = nn.Linear(input_size, other_view_size)
+        self.side_fc = nn.Linear(input_size, other_view_size)
+
+    def forward(self, features):
+        # features is one dimensional vector [global, front, rear, side]
+        global_resnet_features = features[:, :self.input_size]
+        front_resnet_features = features[:, self.input_size: 2 * self.input_size]
+        rear_resnet_features = features[:, 2 * self.input_size: 3 * self.input_size]
+        side_resnet_features = features[:, 3 * self.input_size:]
+
+        global_features = self.global_fc(global_resnet_features)
+        front_features = self.front_fc(front_resnet_features)
+        rear_features = self.rear_fc(rear_resnet_features)
+        side_features = self.side_fc(side_resnet_features)
+
         return torch.cat((global_features, front_features, rear_features, side_features), dim=1)
 
 

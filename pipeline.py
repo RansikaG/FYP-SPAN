@@ -96,6 +96,7 @@ if __name__ == '__main__':
     model.eval()
     pbar = tqdm(total=len(dataloader))
 
+    print('#### preparing image features')
     if not os.path.isdir(feature_tensor_save_path):
         os.mkdir(feature_tensor_save_path)
     for batch_idx, data in enumerate(dataloader):
@@ -109,10 +110,11 @@ if __name__ == '__main__':
         rear_features = activation['rear']
         side_features = activation['side']
 
-        torch.save(global_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_global.pt'))
-        torch.save(front_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_front.pt'))
-        torch.save(rear_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_rear.pt'))
-        torch.save(side_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_side.pt'))
+        # torch.save(global_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_global.pt'))
+        # torch.save(front_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_front.pt'))
+        # torch.save(rear_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_rear.pt'))
+        # torch.save(side_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_side.pt'))
+        torch.save(img_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '.pt'))
         pbar.set_postfix({'Img no': ' {}'.format(batch_idx + 1)})
         pbar.update(1)
     pbar.close()

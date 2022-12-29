@@ -99,6 +99,50 @@ class ImageAndMasksFeatures(Dataset):
         return front_mask, rear_mask, side_mask
 
 
+class ImageFeatures(Dataset):
+    def __init__(self, df, feature_path, device, train=True):
+
+        self.data_csv = df
+        self.is_train = train
+        self.feature_path = feature_path
+        self.device = device
+        if self.is_train:
+            self.images = df['filename'].values
+            self.labels = df['id'].values
+            self.area_ratios = df['area_ratios']
+            self.index = df.index.values
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, item):
+        anchor_image_name = self.images[item]
+        anchor_image_feature_path = self.feature_path + '/' + anchor_image_name.replace('.jpg', '.pt')
+        anchor_image_features = torch.load(anchor_image_feature_path, map_location=self.device)
+        anchor_label = self.labels[item]
+        target = int(anchor_label)
+
+        anchor_area_ratios = np.array(self.area_ratios[item])
+        if self.is_train:
+            positive_list = self.index[self.index != item][self.labels[self.index != item] == anchor_label]
+            positive_item = random.choice(positive_list)
+            positive_image_name = self.images[positive_item]
+            positive_image_feature_path = self.feature_path + '/' + positive_image_name.replace('.jpg', '.pt')
+            positive_image_features = torch.load(positive_image_feature_path, map_location=self.device)
+            positive_area_ratios = np.array(self.area_ratios[positive_item])
+
+            negative_list = self.index[self.index != item][self.labels[self.index != item] != anchor_label]
+            negative_item = random.choice(negative_list)
+            negative_image_name = self.images[negative_item]
+            negative_image_feature_path = self.feature_path + '/' + negative_image_name.replace('.jpg', '.pt')
+            negative_image_features = torch.load(negative_image_feature_path, map_location=self.device)
+            negative_area_ratios = np.array(self.area_ratios[negative_item])
+
+            return anchor_image_features, anchor_area_ratios, positive_image_features, positive_area_ratios, negative_image_features, negative_area_ratios, target
+        else:
+            return anchor_image_features, anchor_area_ratios, target
+
+
 if __name__ == '__main__':
     mask_path = './PartAttMask/image_train'
     csv_path = 'test_images/identities_train/train_data.csv'
