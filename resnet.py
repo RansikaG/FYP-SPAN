@@ -233,7 +233,9 @@ def resnet50_SecondHalf(pretrained=True):
     if pretrained:
         model.load_param(load_state_dict_from_url(model_urls['resnet50']))
     flatten = nn.Flatten()
-    resnet_SecondHalf = nn.Sequential(*list(model.children())[-1:], flatten)
+    resnet_SecondHalf = nn.Sequential(*list(model.children())[-1:], nn.MaxPool2d(3, stride=4), flatten)
+    # resnet_SecondHalf = nn.Sequential(*list(model.children())[-1:], nn.MaxPool2d(12), flatten)
+
     return resnet_SecondHalf
 
 

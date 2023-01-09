@@ -3,6 +3,7 @@ import torch.nn as nn
 import torchvision.transforms as T
 from resnet import resnet34, resnet50, CNN1, CNN2, resnet50_SecondHalf
 import math
+from torchsummary import summary
 
 
 class Generator_Block(nn.Module):
@@ -137,7 +138,8 @@ class Second_Stage_Resnet50_Features(nn.Module):
         front_resnet_features = self.stage2_features_front(front_image)
         rear_resnet_features = self.stage2_features_rear(rear_image)
         side_resnet_features = self.stage2_features_side(side_image)
-        return torch.cat((global_resnet_features, front_resnet_features, rear_resnet_features, side_resnet_features), dim=1)
+        return torch.cat((global_resnet_features, front_resnet_features, rear_resnet_features, side_resnet_features),
+                         dim=1)
 
 
 class FC_Features(nn.Module):
@@ -145,6 +147,8 @@ class FC_Features(nn.Module):
         super(FC_Features, self).__init__()
         self.global_size = global_size
         self.view_size = other_view_size
+        # input_size = 18432
+        input_size = 2048
         self.input_size = input_size
         self.global_fc = nn.Linear(input_size, global_size)
         self.front_fc = nn.Linear(input_size, other_view_size)
@@ -180,3 +184,9 @@ class BoatIDClassifier(nn.Module):
         out = self.fc(features)
         # No softmax since softmax is applied in the cross entropy loss
         return out
+
+
+if __name__ == '__main__':
+    model =  nn.Sequential(resnet50(), nn.MaxPool2d(4, stride=3), nn.Flatten())
+    # model = nn.Sequential(resnet50(), nn.Flatten())
+    print(summary(model, (3, 192, 192), device='cpu'))
