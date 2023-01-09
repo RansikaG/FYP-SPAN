@@ -12,6 +12,7 @@ from ImageMasksDataset import ImageAndMasksFeatures, ImageFeatures
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 Train = True
+feature_extraction = False
 
 # parser = argparse.ArgumentParser(description='Train Semantics-guided Part Attention Network (SPAN) pipeline', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 # parser.add_argument('--mode', required=True, help='Select training or implementation mode; option: ["train", "implement"]')
@@ -68,61 +69,62 @@ if __name__ == '__main__':
     dataframe = pd.read_csv(csv_path, dtype=types_dict)
     dataframe['area_ratios'] = dataframe[['global', 'front', 'rear', 'side']].values.tolist()
 
-    img_dataset = ImageAndMasksFeatures(df=dataframe, image_path=train_data_path, mask_path=mask_path)
-    # dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
-    img_dataloader = DataLoader(img_dataset, batch_size=1, shuffle=False)
+    if feature_extraction:
+        img_dataset = ImageAndMasksFeatures(df=dataframe, image_path=train_data_path, mask_path=mask_path)
+        # dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
+        img_dataloader = DataLoader(img_dataset, batch_size=1, shuffle=False)
 
-    # classifier = model.BoatIDClassifier(num_of_classes=5)
-    resnetExtractor = model.Second_Stage_Resnet50_Features()
+        # classifier = model.BoatIDClassifier(num_of_classes=5)
+        resnetExtractor = model.Second_Stage_Resnet50_Features()
 
-    if torch.cuda.is_available():
-        resnetExtractor.cuda()
+        if torch.cuda.is_available():
+            resnetExtractor.cuda()
 
-    activation = {}
-
-
-    def get_activation(name):
-        def hook(model, image, output):
-            activation[name] = output.detach()
-
-        return hook
+        activation = {}
 
 
-    resnetExtractor.stage2_features_global.register_forward_hook(get_activation('global'))
-    resnetExtractor.stage2_features_front.register_forward_hook(get_activation('front'))
-    resnetExtractor.stage2_features_rear.register_forward_hook(get_activation('rear'))
-    resnetExtractor.stage2_features_side.register_forward_hook(get_activation('side'))
+        def get_activation(name):
+            def hook(model, image, output):
+                activation[name] = output.detach()
 
-    resnetExtractor.eval()
-    pbar = tqdm(total=len(img_dataloader))
+            return hook
 
-    print('#### preparing image features')
-    if not os.path.isdir(feature_tensor_save_path):
-        os.mkdir(feature_tensor_save_path)
-    for batch_idx, data in enumerate(img_dataloader):
-        img, image_masks, img_name = data
 
-        img_features = resnetExtractor(img.to(device), image_masks[0].to(device),
-                                       image_masks[1].to(device), image_masks[2].to(device))
+        resnetExtractor.stage2_features_global.register_forward_hook(get_activation('global'))
+        resnetExtractor.stage2_features_front.register_forward_hook(get_activation('front'))
+        resnetExtractor.stage2_features_rear.register_forward_hook(get_activation('rear'))
+        resnetExtractor.stage2_features_side.register_forward_hook(get_activation('side'))
 
-        global_features = activation['global']
-        front_features = activation['front']
-        rear_features = activation['rear']
-        side_features = activation['side']
+        resnetExtractor.eval()
+        pbar = tqdm(total=len(img_dataloader))
 
-        # torch.save(global_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_global.pt'))
-        # torch.save(front_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_front.pt'))
-        # torch.save(rear_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_rear.pt'))
-        # torch.save(side_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_side.pt'))
-        torch.save(img_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '.pt'))
-        pbar.set_postfix({'Img no': ' {}'.format(batch_idx + 1)})
-        pbar.update(1)
-    pbar.close()
+        print('#### preparing image features')
+        if not os.path.isdir(feature_tensor_save_path):
+            os.mkdir(feature_tensor_save_path)
+        for batch_idx, data in enumerate(img_dataloader):
+            img, image_masks, img_name = data
 
+            img_features = resnetExtractor(img.to(device), image_masks[0].to(device),
+                                           image_masks[1].to(device), image_masks[2].to(device))
+
+            global_features = activation['global']
+            front_features = activation['front']
+            rear_features = activation['rear']
+            side_features = activation['side']
+
+            # torch.save(global_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_global.pt'))
+            # torch.save(front_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_front.pt'))
+            # torch.save(rear_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_rear.pt'))
+            # torch.save(side_features, feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '_side.pt'))
+            torch.save(torch.squeeze(img_features), feature_tensor_save_path + '/' + img_name[0].replace('.jpg', '.pt'))
+            pbar.set_postfix({'Img no': ' {}'.format(batch_idx + 1)})
+            pbar.update(1)
+        pbar.close()
+        del resnetExtractor, img_dataset, img_dataloader
     print('#### Training #####')
     if Train:
         feature_dataset = ImageFeatures(df=dataframe, feature_path=feature_tensor_save_path, device=device)
-        feature_dataloader = DataLoader(img_dataset, batch_size=2, shuffle=False)
+        feature_dataloader = DataLoader(feature_dataset, batch_size=2, shuffle=False)
 
         classifier = model.BoatIDClassifier(num_of_classes=5)
         fc_model = model.FC_Features()

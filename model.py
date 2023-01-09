@@ -141,7 +141,7 @@ class Second_Stage_Resnet50_Features(nn.Module):
 
 
 class FC_Features(nn.Module):
-    def __init__(self, input_size=2560, global_size=1024, other_view_size=512):
+    def __init__(self, input_size=2048 * 12 * 12, global_size=1024, other_view_size=512):
         super(FC_Features, self).__init__()
         self.global_size = global_size
         self.view_size = other_view_size
@@ -176,7 +176,7 @@ class BoatIDClassifier(nn.Module):
 
     def forward(self, features):
         # features should be of size 2560 = 1024 + 512 + 512 + 512
-        out = self.batchNorm(features)
-        out = self.fc(out)
+        # out = self.batchNorm(features)
+        out = self.fc(features)
         # No softmax since softmax is applied in the cross entropy loss
         return out
