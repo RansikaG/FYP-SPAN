@@ -12,7 +12,7 @@ from ImageMasksDataset import ImageAndMasksFeatures, ImageFeatures
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 Train = True
-feature_extraction = False
+feature_extraction = True
 
 # parser = argparse.ArgumentParser(description='Train Semantics-guided Part Attention Network (SPAN) pipeline', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 # parser.add_argument('--mode', required=True, help='Select training or implementation mode; option: ["train", "implement"]')
