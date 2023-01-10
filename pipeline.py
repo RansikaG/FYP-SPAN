@@ -66,9 +66,9 @@ if __name__ == '__main__':
     dataframe['area_ratios'] = dataframe[['global', 'front', 'rear', 'side']].values.tolist()
 
     dataset = ImageMasksTriplet(df=dataframe, image_path=train_data_path, mask_path=mask_path)
-    # dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
-                            persistent_workers=True)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=1)
+    # dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
+    #                         # persistent_workers=True)
 
     classifier = model.BoatIDClassifier(num_of_classes=5)
     model = model.Second_Stage_Extractor()
