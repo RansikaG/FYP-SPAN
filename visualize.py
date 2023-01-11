@@ -76,5 +76,5 @@ def visualize(image_root, foreground_grabcut_root=None, foreground_dl_root=None,
                 ax = fig.add_subplot(6, num_sample + 1, (num_sample + 1) * 5 + idx + 2);
                 ax.axis('off')
                 ax.imshow(image * side[:, :, np.newaxis])
-        plt.show()
+        # plt.show()
         plt.savefig('mask_visualization_' + str(i) + '.png')
