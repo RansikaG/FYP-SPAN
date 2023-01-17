@@ -2,6 +2,7 @@ import torch
 import numpy as np
 #import time
 import os
+import pathlib
 from PIL import Image
 import model
 
@@ -82,6 +83,31 @@ def mAP(query_images, query_images_id, num_of_ids, gallery_images, gallery_image
         total += precision_total / num_of_ids[i]
     return total / len(query_images)
 
+
+root_dir = "./images/test"
+query_dir = pathlib.Path(root_dir + "/query")
+gallery_dir = pathlib.Path(root_dir + "/gallery")
+query_images = []
+query_images_id = []
+gallery_images = []
+gallery_images_ids = []
+num_of_ids = []
+
+
+for root, query_dirs, query_images_names in os.walk(query_dir, topdown=True):
+    if len(query_images_names) != 0:
+        for i in range(len(query_images_names)):
+            if query_images_names[i][-3:]=='jpg':
+                query_images.append(query_images_names[i])
+            query_images_id.append(root[2:])
+
+for root, gallery_dirs, gallery_images_names in os.walk(gallery_dir, topdown=True):
+    if len(gallery_images_names) != 0:
+        for i in range(len(gallery_images_names)):
+            if gallery_images_names[i][-3:]=='jpg':
+                query_images.append(gallery_images_names[i])
+            query_images_id.append(root[2:])
+        num_of_ids.append(len(gallery_images_names))
 
 top1 = accuracy(query_images, query_images_id, gallery_images, gallery_images_ids, 1)
 top5 = accuracy(query_images, query_images_id, gallery_images, gallery_images_ids, 5)
