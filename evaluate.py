@@ -17,20 +17,14 @@ def calc_euclidean(x1, x1_area_ratio, x2, x2_area_ratio):
     distance = (x1 - x2).pow(2)
     global_distance = distance[:, :global_feature_size] * normalized_cam[:, 0:1]
     front_distance = distance[:,
-                     global_feature_size: global_feature_size + part_feature_size] * normalized_cam[
-                                                                                                    :, 1:2]
+                     global_feature_size: global_feature_size + part_feature_size] * normalized_cam[:, 1:2]
     rear_distance = distance[:,
-                    global_feature_size + part_feature_size: global_feature_size + 2 * part_feature_size] * normalized_cam[
-                                                                                                                                :,
-                                                                                                                                2:3]
+                    global_feature_size + part_feature_size: global_feature_size + 2 * part_feature_size] * normalized_cam[:, 2:3]
     side_distance = distance[:, global_feature_size + 2 * part_feature_size:] * normalized_cam[:, 3:]
     weighted_distance = torch.cat((global_distance, front_distance, rear_distance, side_distance), 1).sum(1)
     return weighted_distance
 
-
 def get_area_ratios(image_name):
-    # image_root='./PartAttMask/image_query'
-    # image = os.path.join(image_root, image_name)
     front = Image.open(image_name.replace('.jpg', '_front.jpg'))
     front_area = np.sum(np.array(front) / 255)
     rear = Image.open(image_name.replace('.jpg', '_rear.jpg'))
@@ -42,15 +36,14 @@ def get_area_ratios(image_name):
     rear_area /= global_area
     side_area /= global_area
     global_area /= global_area
-    # print('global: {} \nfront: {} \nrear:{} \nside: {}'.format(global_area, front_area, rear_area, side_area))
     area_ratios = np.array([global_area, front_area, rear_area, side_area])
     return area_ratios
 
 def compare(query_image, gallery_image):
     query_img_features = model(query_image)
     gallery_img_features = model(gallery_image)
-    query_area_ratios = calc_euclidean(query_image)
-    gallery_area_ratios = calc_euclidean(gallery_image)
+    query_area_ratios = get_area_ratios(query_image)
+    gallery_area_ratios = get_area_ratios(gallery_image)
 
     weighted_distance = calc_euclidean(query_img_features, query_area_ratios, gallery_img_features, gallery_area_ratios)
     
