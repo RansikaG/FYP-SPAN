@@ -3,8 +3,10 @@ import numpy as np
 #import time
 import os
 from PIL import Image
+import model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.Second_Stage_Extractor()
 
 def calc_euclidean(x1, x1_area_ratio, x2, x2_area_ratio):
     global_feature_size=1024
@@ -45,8 +47,8 @@ def get_area_ratios(image_name):
     return area_ratios
 
 def compare(query_image, gallery_image):
-    query_img_features = model(query_image)  #model eken ena feature vector eka methnarta one
-    gallery_img_features = model(gallery_image) #model eken ena feature vector eka methnarta one
+    query_img_features = model(query_image)
+    gallery_img_features = model(gallery_image)
     query_area_ratios = calc_euclidean(query_image)
     gallery_area_ratios = calc_euclidean(gallery_image)
 
