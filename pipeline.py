@@ -14,8 +14,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # parser = argparse.ArgumentParser(description='Train Semantics-guided Part Attention Network (SPAN) pipeline', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 # parser.add_argument('--mode', required=True, help='Select training or implementation mode; option: ["train", "implement"]')
 
-img_root = "./test_images/image_test"
-mask_root = "./PartAttMask/image_test"
+img_root = "/home/fyp3-2/Desktop/BATCH18/ReID_check/train"
+mask_root = "/home/fyp3-2/Desktop/BATCH18/ReID_check/masks_train"
 
 
 class TripletLossWithCPDM(nn.Module):
@@ -57,9 +57,9 @@ if __name__ == '__main__':
     #                        T.ToTensor(),
     #                        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
-    csv_path = 'test_images/identities_train/train_data.csv'
-    train_data_path = './test_images/identities_train'
-    mask_path = './PartAttMask/image_train'
+    csv_path = "/home/fyp3-2/Desktop/BATCH18/ReID_check/train_data.csv"
+    train_data_path = "/home/fyp3-2/Desktop/BATCH18/ReID_check/train"
+    mask_path = "/home/fyp3-2/Desktop/BATCH18/ReID_check/masks_train"
 
     types_dict = {'filename': str, 'id': str, 'global': float, 'front': float, 'rear': float, 'side': float}
     dataframe = pd.read_csv(csv_path, dtype=types_dict)
@@ -70,14 +70,18 @@ if __name__ == '__main__':
     # dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
     #                         # persistent_workers=True)
 
-    classifier = model.BoatIDClassifier(num_of_classes=5)
+    classifier = model.BoatIDClassifier(num_of_classes=474)
     model = model.Second_Stage_Extractor()
 
     if torch.cuda.is_available():
         model.cuda()
         classifier.cuda()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-    epoch = 2
+    optimizer = optim.Adam(model.parameters(), lr=0.00001)
+    epoch = 1
+
+    triplet_loss_bucket=[]
+    CE_loss_bucket = []
+    total_loss_bucket = []
     for ep in range(epoch):
         model.train()
         print('\nStarting epoch %d / %d :' % (ep + 1, epoch))
@@ -106,10 +110,15 @@ if __name__ == '__main__':
             lambda_triplet = 1
             loss = lambda_ID * cross_entropy_loss + lambda_triplet * triplet_loss
 
+            triplet_loss_bucket.append(triplet_loss)
+            CE_loss_bucket.append(cross_entropy_loss)
+            total_loss_bucket.append(loss)
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            pbar.set_postfix({'Triplet_loss': ' {0:1.3f}'.format(loss / (batch_idx + 1))})
+            pbar.set_postfix({'Triplet_loss': ' {0:1.6f}'.format(triplet_loss/len(dataloader)), 'ID_loss': ' {0:1.6f}'.format(cross_entropy_loss/len(dataloader))})
             pbar.update(1)
         pbar.close()
+    torch.save(model, "/home/fyp3-2/Desktop/BATCH18/ReID_check/temp.pth")
