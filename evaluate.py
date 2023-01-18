@@ -1,17 +1,28 @@
 import torch
 import numpy as np
-#import time
+# import time
 import os
+import torch.nn as nn
 import pathlib
 from PIL import Image
-import model
+#import model
+import cv2
+from torchvision.transforms import transforms
+
+import random
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = model.Second_Stage_Extractor()
+
+model = torch.load("/home/fyp3-2/Desktop/BATCH18/ReID_check/temp.pth")
+if torch.cuda.is_available():
+    model.cuda()
 
 def calc_euclidean(x1, x1_area_ratio, x2, x2_area_ratio):
-    global_feature_size=1024
-    part_feature_size=512
+    global_feature_size = 2
+    part_feature_size = 1
+    #global_feature_size = 1024
+    #part_feature_size = 512
     cam = np.array(x1_area_ratio) * np.array(x2_area_ratio)
     normalized_cam = cam / np.sum(cam, axis=1, keepdims=True)
     normalized_cam = torch.from_numpy(normalized_cam).float().to(device)
@@ -20,17 +31,20 @@ def calc_euclidean(x1, x1_area_ratio, x2, x2_area_ratio):
     front_distance = distance[:,
                      global_feature_size: global_feature_size + part_feature_size] * normalized_cam[:, 1:2]
     rear_distance = distance[:,
-                    global_feature_size + part_feature_size: global_feature_size + 2 * part_feature_size] * normalized_cam[:, 2:3]
+                    global_feature_size + part_feature_size: global_feature_size + 2 * part_feature_size] * normalized_cam[
+                                                                                                            :, 2:3]
     side_distance = distance[:, global_feature_size + 2 * part_feature_size:] * normalized_cam[:, 3:]
     weighted_distance = torch.cat((global_distance, front_distance, rear_distance, side_distance), 1).sum(1)
     return weighted_distance
 
-def get_area_ratios(image_name):
-    front = Image.open(image_name.replace('.jpg', '_front.jpg'))
+
+def get_area_ratios(image_name, mask_root):
+    image = os.path.join(mask_root, image_name)
+    front = Image.open(image.replace('.jpg', '_front.jpg'))
     front_area = np.sum(np.array(front) / 255)
-    rear = Image.open(image_name.replace('.jpg', '_rear.jpg'))
+    rear = Image.open(image.replace('.jpg', '_rear.jpg'))
     rear_area = np.sum(np.array(rear) / 255)
-    side = Image.open(image_name.replace('.jpg', '_side.jpg'))
+    side = Image.open(image.replace('.jpg', '_side.jpg'))
     side_area = np.sum(np.array(side) / 255)
     global_area = front_area + rear_area + side_area
     front_area /= global_area
@@ -40,78 +54,145 @@ def get_area_ratios(image_name):
     area_ratios = np.array([global_area, front_area, rear_area, side_area])
     return area_ratios
 
-def compare(query_image, gallery_image):
-    query_img_features = model(query_image)
-    gallery_img_features = model(gallery_image)
-    query_area_ratios = get_area_ratios(query_image)
-    gallery_area_ratios = get_area_ratios(gallery_image)
 
-    weighted_distance = calc_euclidean(query_img_features, query_area_ratios, gallery_img_features, gallery_area_ratios)
+def compare(query_image, query_image_id, gallery_image, gallery_image_id):
+    img_transform = transforms.Compose([transforms.Resize([192, 192]), transforms.ToTensor()])
+    mask_transform = transforms.Compose([transforms.Resize([24, 24]), transforms.ToTensor()])
     
-    return weighted_distance
+    imageQuery = img_transform(Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query/' + query_image_id + '/' + query_image).convert('RGB'))
+    frontQuery = mask_transform(Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_front.jpg'))
+    rearQuery = mask_transform(Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_rear.jpg'))
+    sideQuery = mask_transform(Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_side.jpg'))
+    
+    imageGallery = img_transform(Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query/' + query_image_id + '/' + query_image).convert('RGB'))
+    frontGallery = mask_transform(Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_front.jpg'))
+    rearGallery = mask_transform(Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_rear.jpg'))
+    sideGallery = mask_transform(Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_side.jpg'))
+
+    #query_img_features = model(imageQuery.to(device), frontQuery.to(device), rearQuery.to(device), sideQuery.to(device))
+    #gallery_img_features = model(imageGallery.to(device), frontGallery.to(device), rearGallery.to(device), sideGallery.to(device))
+    #print(query_img_features)
+    
+    query_area_ratios = get_area_ratios(query_image, "/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks")
+    gallery_area_ratios = get_area_ratios(gallery_image, "/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/gallery_masks")
+    
+    #weighted_distance = calc_euclidean(np.array([2,3,3,4,6]), query_area_ratios, np.array([1,4,5,7,8]), gallery_area_ratios)
+
+    #weighted_distance = calc_euclidean(query_img_features, query_area_ratios, gallery_img_features, gallery_area_ratios)
+
+    num1 = random.randint(0, 9)
+    
+    return num1
+    #return weighted_distance
+
 
 def accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids, top):
+    #divider = "###########"
+    #print(query_images)
+    #print(divider)
+    #print(query_images_ids)
+    #print(divider)
+    #print(gallery_images)
+    #print(divider)
+    #print(gallery_images_ids)
+    #print(divider)
     final_accuracy = 0
     for i in range(len(query_images)):
+        #print("step" + str(i+1))
         distances = {}
         for j in range(len(gallery_images)):
-            weighted_distance = compare(query_images[i], gallery_images[j])
-            distances[gallery_images_ids[j]] = weighted_distance
-        sorted_distances = sorted(distances.items(), key=lambda x:x[1])
-        correct_instances = sorted_distances.keys()[:top].count(query_images_ids[i])
+            weighted_distance = compare(query_images[i], query_images_ids[i], gallery_images[j], gallery_images_ids[j])
+            distances[gallery_images_ids[j] + gallery_images[j]] = weighted_distance
+        #print(distances)
+        #print(divider)
+        sorted_distances = sorted(distances.items(), key=lambda x: x[1])
+        #print(sorted_distances)
+        keys = []
+        #print(divider)
+        for k in sorted_distances:
+            keys.append(k[0][:3])
+        #print(keys)
+        correct_instances = keys[:top].count(query_images_ids[i])
+        #print("step" + str(i+1), correct_instances)
         final_accuracy += correct_instances
-    return final_accuracy/(top*len(query_images))
+    return final_accuracy / (top * len(query_images))
 
 
-def mAP(query_images, query_images_id, num_of_ids, gallery_images, gallery_images_ids):
+def mAP(query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids):
     total = 0
     for i in range(len(query_images)):
+        #print("step" + str(i+1))
         distances = {}
         for j in range(len(gallery_images)):
-            weighted_distance = compare(query_images[i], gallery_images[j])
-            distances[gallery_images_ids[j]] = weighted_distance
-        sorted_distances = sorted(distances.items(), key=lambda x:x[1])
-        instances = sorted_distances.keys()
+            weighted_distance = compare(query_images[i], query_images_ids[i], gallery_images[j], gallery_images_ids[j])
+            distances[gallery_images_ids[j] + gallery_images[j]] = weighted_distance
+        #print(distances)
+        #print(divider)
+        sorted_distances = sorted(distances.items(), key=lambda x: x[1])
+        #print(sorted_distances)
+        #print(divider)
+        instances = []
+        for k in sorted_distances:
+            instances.append(k[0][:3])
+        #print(instances)
         correct_instances = 0
         precision_total = 0
-        for x in range(1, len(instances) +  1):
+        for x in range(1, len(instances) + 1):
             if correct_instances == num_of_ids[i]:
+                #print(x-1)
                 break
-            elif instances[x] == query_images_id[i]:
+            elif instances[x - 1] == query_images_ids[i]:
                 correct_instances += 1
-                precision_total  += correct_instances / x
+                #print(correct_instances, x, correct_instances / x)
+                precision_total += correct_instances / x
         total += precision_total / num_of_ids[i]
     return total / len(query_images)
 
 
-root_dir = "./images/test"
-query_dir = pathlib.Path(root_dir + "/query")
-gallery_dir = pathlib.Path(root_dir + "/gallery")
+root_dir = "/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula"
+query_dir = root_dir + "/query"
+gallery_dir = root_dir + "/gallery"
 query_images = []
-query_images_id = []
+query_images_ids = []
 gallery_images = []
 gallery_images_ids = []
 num_of_ids = []
 
-
 for root, query_dirs, query_images_names in os.walk(query_dir, topdown=True):
     if len(query_images_names) != 0:
         for i in range(len(query_images_names)):
-            if query_images_names[i][-3:]=='jpg':
+            if query_images_names[i][-3:] == 'jpg':
                 query_images.append(query_images_names[i])
-            query_images_id.append(root[2:])
+            query_images_ids.append(root[-3:])
 
 for root, gallery_dirs, gallery_images_names in os.walk(gallery_dir, topdown=True):
     if len(gallery_images_names) != 0:
         for i in range(len(gallery_images_names)):
-            if gallery_images_names[i][-3:]=='jpg':
-                query_images.append(gallery_images_names[i])
-            query_images_id.append(root[2:])
+            if gallery_images_names[i][-3:] == 'jpg':
+                gallery_images.append(gallery_images_names[i])
+            gallery_images_ids.append(root[-3:])
         num_of_ids.append(len(gallery_images_names))
 
-top1 = accuracy(query_images, query_images_id, gallery_images, gallery_images_ids, 1)
-top5 = accuracy(query_images, query_images_id, gallery_images, gallery_images_ids, 5)
-top10 = accuracy(query_images, query_images_id, gallery_images, gallery_images_ids, 10)
-MAP = mAP(query_images, query_images_id, num_of_ids, gallery_images, gallery_images_ids)
+#divider = "###########"
+#print(query_images)
+#print(divider)
+#print(query_images_ids)
+#print(divider)
+#print(gallery_images)
+#print(divider)
+#print(gallery_images_ids)
+#print(divider)
+#print(num_of_ids)
 
-print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(top1,top5,top10,MAP))
+#print(compare(query_images[0], query_images_ids[0], gallery_images[0], gallery_images_ids[0]))
+#print(accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids, 10))
+#print(mAP(query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids))
+top1 = accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids, 1)
+top5 = accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids, 5)
+top10 = accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids, 10)
+
+MAP = mAP(query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids)
+
+print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f' % (top1, top5, top10, MAP))
+
+
