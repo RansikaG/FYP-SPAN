@@ -43,31 +43,24 @@ if __name__ == '__main__':
 
     Folder_list=os.listdir(args.image_root)
     for k in Folder_list:
-        #os.mkdir('mask_generate')   #this should be specified according to the folder
-        # os.mkdir('image_test')
-        # os.mkdir('image_query')
-        # os.mkdir('image_train')
+        
         for (root,dirs,files) in os.walk(args.image_root+'/'+k, topdown=True):
-            if len(dirs)==0:
+            if len(dirs) == 0:
                 for i in files:
                     shutil.copy(root+'/'+i, args.image_root+'/'+k+'/'+i)
                 print(root)
                 shutil.rmtree(root)
 
-        #os.mkdir('./mask_generate/dl')
-        #os.mkdir('mask_generate/part_attention')
-        #os.mkdir('mask_generate/part_attention_ckpt')
-
-        part_att_root=args.image_root+'/mask_generate_{}/part_attention'.format(k)
+        part_att_root = args.image_root+'/mask_generate_{}/part_attention'.format(k)
 
 
         print("\n### Generate part attention mask ###")
         checkpoint = os.path.join(args.part_att_ckpt, '10.ckpt')
         PartAttGen.implement(image_root=args.image_root,
-                            mask_root=part_att_root,
-                            model=model.PartAtt_Generator().to(device),
-                            device=device,
-                            checkpoint=checkpoint)
+                            mask_root= part_att_root,
+                            model= model.PartAtt_Generator().to(device),
+                            device= device,
+                            checkpoint= checkpoint)
 
 
         for (root,dirs,files) in os.walk(args.image_root+'/mask_generate_'+k+'/part_attention', topdown=True):
