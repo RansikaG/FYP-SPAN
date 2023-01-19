@@ -25,7 +25,7 @@ class TripletLossWithCPDM(nn.Module):
         self.global_feature_size = global_feature_size
         self.part_feature_size = part_feature_size
 
-    def calc_euclidean(self, x1, x1_area_ratio, x2, x2_area_ratio):
+    def calc_distance_vector(self, x1, x1_area_ratio, x2, x2_area_ratio):
         cam = np.array(x1_area_ratio) * np.array(x2_area_ratio)
         normalized_cam = cam / np.sum(cam, axis=1, keepdims=True)
         normalized_cam = torch.from_numpy(normalized_cam).float().to(device)
@@ -44,8 +44,8 @@ class TripletLossWithCPDM(nn.Module):
         return weighted_distance
 
     def forward(self, anchor, anchor_area_ratio, positive, positive_area_ratio, negative, negative_area_ratio):
-        distance_positive = self.calc_euclidean(anchor, anchor_area_ratio, positive, positive_area_ratio)
-        distance_negative = self.calc_euclidean(anchor, anchor_area_ratio, negative, negative_area_ratio)
+        distance_positive = self.calc_distance_vector(anchor, anchor_area_ratio, positive, positive_area_ratio)
+        distance_negative = self.calc_distance_vector(anchor, anchor_area_ratio, negative, negative_area_ratio)
         losses = torch.relu(distance_positive - distance_negative + self.margin)
 
         return losses.mean()
