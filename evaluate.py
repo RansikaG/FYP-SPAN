@@ -1,15 +1,9 @@
-import torch
-import numpy as np
-# import time
 import os
-import torch.nn as nn
-import pathlib
+from tqdm import tqdm
+import numpy as np
+import torch
 from PIL import Image
-# import model
-import cv2
 from torchvision.transforms import transforms
-
-import random
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -57,35 +51,27 @@ def get_area_ratios(image_name, mask_root):
     return area_ratios
 
 
-def compare(query_image, query_image_id, gallery_image, gallery_image_id):
+def compare(query_dir, query_mask_dir, gallery_dir, gallery_mask_dir, query_image, query_image_id, gallery_image,
+            gallery_image_id):
     img_transform = transforms.Compose([transforms.Resize([192, 192]), transforms.ToTensor()])
     mask_transform = transforms.Compose([transforms.Resize([24, 24]), transforms.ToTensor()])
 
-    imageQueryT = img_transform(Image.open(
-        '/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query/' + query_image_id + '/' + query_image).convert('RGB'))
+    imageQueryT = img_transform(Image.open(query_dir + '/' + query_image_id + '/' + query_image).convert('RGB'))
     imageQuery = torch.unsqueeze(imageQueryT, 0)
-    frontQueryT = mask_transform(
-        Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_front.jpg'))
+    frontQueryT = mask_transform(Image.open(query_mask_dir + '/' + query_image[:-4] + '_front.jpg'))
     frontQuery = torch.unsqueeze(frontQueryT, 0)
-    rearQueryT = mask_transform(
-        Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_rear.jpg'))
+    rearQueryT = mask_transform(Image.open(query_mask_dir + '/' + query_image[:-4] + '_rear.jpg'))
     rearQuery = torch.unsqueeze(rearQueryT, 0)
-    sideQueryT = mask_transform(
-        Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks/' + query_image[:-4] + '_side.jpg'))
+    sideQueryT = mask_transform(Image.open(query_mask_dir + '/' + query_image[:-4] + '_side.jpg'))
     sideQuery = torch.unsqueeze(sideQueryT, 0)
 
-    imageGalleryT = img_transform(Image.open(
-        '/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/gallery/' + gallery_image_id + '/' + gallery_image).convert(
-        'RGB'))
+    imageGalleryT = img_transform(Image.open(gallery_dir + '/' + gallery_image_id + '/' + gallery_image).convert('RGB'))
     imageGallery = torch.unsqueeze(imageGalleryT, 0)
-    frontGalleryT = mask_transform(Image.open(
-        '/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/gallery_masks/' + gallery_image[:-4] + '_front.jpg'))
+    frontGalleryT = mask_transform(Image.open(gallery_mask_dir + '/' + gallery_image[:-4] + '_front.jpg'))
     frontGallery = torch.unsqueeze(frontGalleryT, 0)
-    rearGalleryT = mask_transform(
-        Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/gallery_masks/' + gallery_image[:-4] + '_rear.jpg'))
+    rearGalleryT = mask_transform(Image.open(gallery_mask_dir + '/' + gallery_image[:-4] + '_rear.jpg'))
     rearGallery = torch.unsqueeze(rearGalleryT, 0)
-    sideGalleryT = mask_transform(
-        Image.open('/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/gallery_masks/' + gallery_image[:-4] + '_side.jpg'))
+    sideGalleryT = mask_transform(Image.open(gallery_mask_dir + '/' + gallery_image[:-4] + '_side.jpg'))
     sideGallery = torch.unsqueeze(sideGalleryT, 0)
 
     # print(imageQuery.shape)
@@ -93,22 +79,18 @@ def compare(query_image, query_image_id, gallery_image, gallery_image_id):
     gallery_img_features = model(imageGallery.to(device), frontGallery.to(device), rearGallery.to(device),
                                  sideGallery.to(device))
 
-    query_area_ratios = get_area_ratios(query_image, "/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/query_masks")
-    gallery_area_ratios = get_area_ratios(gallery_image,
-                                          "/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula/gallery_masks")
+    query_area_ratios = get_area_ratios(query_image, query_mask_dir)
+    gallery_area_ratios = get_area_ratios(gallery_image,gallery_mask_dir)
 
     # weighted_distance = calc_euclidean(np.array([2,3,3,4,6]), query_area_ratios, np.array([1,4,5,7,8]), gallery_area_ratios)
     #
     weighted_distance = calc_euclidean(query_img_features, query_area_ratios, gallery_img_features, gallery_area_ratios)
     # print(weighted_distance)
     # num1 = random.randint(0, 99)
-
-    # return
-    # return num1
     return weighted_distance
 
 
-def accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids):
+def accuracy(query_dir, query_mask_dir, gallery_dir, gallery_mask_dir, query_images, query_images_ids, gallery_images, gallery_images_ids):
     # divider = "###########"
     # print(query_images)
     # print(divider)
@@ -121,11 +103,14 @@ def accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids)
     final_accuracy1 = 0
     final_accuracy5 = 0
     final_accuracy10 = 0
+    pbar = tqdm(total=len(query_images))
     for i in range(len(query_images)):
-        # print("step" + str(i+1))
+        print("step" + str(i+1))
         distances = {}
         for j in range(len(gallery_images)):
-            weighted_distance = compare(query_images[i], query_images_ids[i], gallery_images[j], gallery_images_ids[j])
+            print(j)
+            weighted_distance = compare(query_dir, query_mask_dir, gallery_dir, gallery_mask_dir, query_images[i], query_images_ids[i], gallery_images[j],
+                                        gallery_images_ids[j])
             distances[gallery_images_ids[j] + gallery_images[j]] = weighted_distance
         # print(distances)
         # print(divider)
@@ -149,17 +134,20 @@ def accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids)
         final_accuracy1 += correct_instances1
         final_accuracy5 += correct_instances5
         final_accuracy10 += correct_instances10
+        pbar.update(1)
+    pbar.close()
     return final_accuracy1 / len(query_images), final_accuracy5 / len(query_images), final_accuracy10 / len(
         query_images)
 
 
-def mAP(query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids):
+def mAP(query_dir, query_mask_dir, gallery_dir, gallery_mask_dir, query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids):
     total = 0
+    pbar = tqdm(total=len(query_images))
     for i in range(len(query_images)):
         # print("step" + str(i+1))
         distances = {}
         for j in range(len(gallery_images)):
-            weighted_distance = compare(query_images[i], query_images_ids[i], gallery_images[j], gallery_images_ids[j])
+            weighted_distance = compare(query_dir, query_mask_dir, gallery_dir, gallery_mask_dir, query_images[i], query_images_ids[i], gallery_images[j], gallery_images_ids[j])
             distances[gallery_images_ids[j] + gallery_images[j]] = weighted_distance
         # print(distances)
         # print(divider)
@@ -181,50 +169,56 @@ def mAP(query_images, query_images_ids, num_of_ids, gallery_images, gallery_imag
                 # print(correct_instances, x, correct_instances / x)
                 precision_total += correct_instances / x
         total += precision_total / num_of_ids[i]
+        pbar.update(1)
+    pbar.close()
     return total / len(query_images)
 
 
-root_dir = "/home/fyp3-2/Desktop/BATCH18/ReID_check/manjula"
-query_dir = root_dir + "/query"
-gallery_dir = root_dir + "/gallery"
-query_images = []
-query_images_ids = []
-gallery_images = []
-gallery_images_ids = []
-num_of_ids = []
+def reid_evaluation(root_dir, mask_dir):
+    query_dir = root_dir + "/query"
+    gallery_dir = root_dir + "/gallery"
+    query_mask_dir = mask_dir + "/query"
+    gallery_mask_dir = mask_dir + "/gallery"
+    query_images = []
+    query_images_ids = []
+    gallery_images = []
+    gallery_images_ids = []
+    num_of_ids = []
 
-for root, query_dirs, query_images_names in os.walk(query_dir, topdown=True):
-    if len(query_images_names) != 0:
-        for i in range(len(query_images_names)):
-            if query_images_names[i][-3:] == 'jpg':
-                query_images.append(query_images_names[i])
-            query_images_ids.append(root[-3:])
+    for root, query_dirs, query_images_names in os.walk(query_dir, topdown=True):
+        if len(query_images_names) != 0:
+            for i in range(len(query_images_names)):
+                if query_images_names[i][-3:] == 'jpg':
+                    query_images.append(query_images_names[i])
+                query_images_ids.append(root[-3:])
 
-for root, gallery_dirs, gallery_images_names in os.walk(gallery_dir, topdown=True):
-    if len(gallery_images_names) != 0:
-        for i in range(len(gallery_images_names)):
-            if gallery_images_names[i][-3:] == 'jpg':
-                gallery_images.append(gallery_images_names[i])
-            gallery_images_ids.append(root[-3:])
-        num_of_ids.append(len(gallery_images_names))
+    for root, gallery_dirs, gallery_images_names in os.walk(gallery_dir, topdown=True):
+        if len(gallery_images_names) != 0:
+            for i in range(len(gallery_images_names)):
+                if gallery_images_names[i][-3:] == 'jpg':
+                    gallery_images.append(gallery_images_names[i])
+                gallery_images_ids.append(root[-3:])
+            num_of_ids.append(len(gallery_images_names))
 
-# divider = "###########"
-# print(query_images)
-# print(divider)
-# print(query_images_ids)
-# print(divider)
-# print(gallery_images)
-# print(divider)
-# print(gallery_images_ids)
-# print(divider)
-# print(num_of_ids)
+    # divider = "###########"
+    # print(query_images)
+    # print(divider)
+    # print(query_images_ids)
+    # print(divider)
+    # print(gallery_images)
+    # print(divider)
+    # print(gallery_images_ids)
+    # print(divider)
+    # print(num_of_ids)
 
-# print(compare(query_images[0], query_images_ids[0], gallery_images[0], gallery_images_ids[0]))
-# print(accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids, 10))
-# print(mAP(query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids))
+    # print(compare(query_images[0], query_images_ids[0], gallery_images[0], gallery_images_ids[0]))
+    # print(accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids, 10))
+    # print(mAP(query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids))
 
-top1, top5, top10 = accuracy(query_images, query_images_ids, gallery_images, gallery_images_ids)
+    print("### Calculating Accuracy ###")
+    top1, top5, top10 = accuracy(query_dir, query_mask_dir, gallery_dir, gallery_mask_dir, query_images, query_images_ids, gallery_images,
+                                 gallery_images_ids)
+    print("### Calculating MAP ###")
+    MAP = mAP(query_dir, query_mask_dir, gallery_dir, gallery_mask_dir, query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids)
 
-MAP = mAP(query_images, query_images_ids, num_of_ids, gallery_images, gallery_images_ids)
-
-print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f' % (top1, top5, top10, MAP))
+    print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f' % (top1, top5, top10, MAP))

@@ -5,6 +5,8 @@ import numpy as np
 import torch
 
 import data_preparation
+import train
+import evaluate
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -16,9 +18,18 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', required=True, help='path to Re-ID dataset')
     parser.add_argument('--part_att_ckpt', required=True, help='path to part attention mask model checkpoint')
     parser.add_argument('--mask_dir', required=True, help='path to target part attention mask dir')
+    parser.add_argument('--train_csv_path', required=True, help='path to csv file with train data')
 
     args = parser.parse_args()
 
-    data_preparation.pipeline_span(Or_image_root=args.dataset,
-                                   part_att_ckpt=args.part_att_ckpt,
-                                   target_dir=args.mask_dir)
+    print("### Mask Preparation ###")
+    # data_preparation.pipeline_span(Or_image_root=args.dataset,
+    #                                part_att_ckpt=args.part_att_ckpt,
+    #                                target_dir=args.mask_dir)
+    print("### ReID Train ###")
+    train_data_path = args.dataset + '/train'
+    train_mask_path = args.mask_dir + '/attention_masks_gen/train'
+    # train.reid_train(csv_path=args.train_csv_path, train_data_path=train_data_path, mask_path=train_mask_path)
+    train_mask_path = args.mask_dir + '/attention_masks_gen'
+    print('### Evaluate ###')
+    evaluate.reid_evaluation(root_dir=args.dataset, mask_dir=train_mask_path)
