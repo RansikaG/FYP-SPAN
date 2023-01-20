@@ -42,10 +42,9 @@ def pipeline_span(Or_image_root, mask_dl_ckpt, part_att_ckpt, target_dir):
     #-----parser.add_argument('--part_att_ckpt', default='./PartAttMask_ckpt', help='path to store part attention mask generator checkpoint')
     #-----args = parser.parse_args()
     temp_dataset_root=Or_image_root+'/temp_data'
-    try:
+    if not os.path.isdir(temp_dataset_root):
         os.mkdir(temp_dataset_root)
-    except:
-        print('Temp folder is already there')
+    
 
     f_list=os.listdir(Or_image_root)
     for i in f_list:
@@ -63,29 +62,29 @@ def pipeline_span(Or_image_root, mask_dl_ckpt, part_att_ckpt, target_dir):
                     print(root)
                     shutil.rmtree(root)
 
-            tar_dir_name=target_dir+'/mask_generate_{}'.format(k)
-            if not os.path.isdir(tar_dir_name):
-                os.mkdir(tar_dir_name)
+    tar_dir_name=target_dir+'/attention_masks_gen'
+    if not os.path.isdir(tar_dir_name):
+        os.mkdir(tar_dir_name)
 
-            part_att_root = tar_dir_name+'/part_attention'
+    part_att_root = tar_dir_name
+
+    print("\n### Generate part attention mask ###")
+    checkpoint = os.path.join(part_att_ckpt, '10.ckpt')
+    PartAttGen.implement(image_root=image_root,
+                        mask_root= part_att_root,
+                        model= model.PartAtt_Generator().to(device),
+                        device= device,
+                        checkpoint= checkpoint)
 
 
-            print("\n### Generate part attention mask ###")
-            checkpoint = os.path.join(part_att_ckpt, '10.ckpt')
-            PartAttGen.implement(image_root=image_root,
-                                mask_root= part_att_root,
-                                model= model.PartAtt_Generator().to(device),
-                                device= device,
-                                checkpoint= checkpoint)
-
-
-        for (root,dirs,files) in os.walk(image_root+'/mask_generate_'+k+'/part_attention', topdown=True):
-            if len(dirs)==0:
-                for i in files:
-                    shutil.copy(root+'/'+i , image_root+'/mask_generate_'+k+'/part_attention'+'/'+i)
-                shutil.rmtree(root)
+        # for (root,dirs,files) in os.walk(image_root+'/mask_generate_'+k+'/part_attention', topdown=True):
+        #     if len(dirs)==0:
+        #         for i in files:
+        #             shutil.copy(root+'/'+i , image_root+'/mask_generate_'+k+'/part_attention'+'/'+i)
+        #         shutil.rmtree(root)
     
     shutil.rmtree(temp_dataset_root)
+    shutil.rmtree(part_att_root+'/temp_data')
     return 0
 
         
