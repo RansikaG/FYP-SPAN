@@ -26,7 +26,7 @@ def create_folder_name(name):
 
 def create_csv_with_area_ratios(image_path, mask_path, csv_path):
     first = True
-    with open(csv_path + '/train_data.csv', 'w', newline='') as csvfile:
+    with open(csv_path + '/val_data.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['filename', 'id', 'global', 'front', 'rear', 'side'])
         no_of_identities = 0

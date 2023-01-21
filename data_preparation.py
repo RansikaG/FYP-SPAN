@@ -7,11 +7,12 @@ import torch
 from torch.backends import cudnn
 
 import PartAttGen
+import BGRemove_DL
 # from visualize import visualize
 import model
 
 
-def pipeline_span(Or_image_root, part_att_ckpt, target_dir):
+def pipeline_span(Or_image_root, mask_dl_ckpt, part_att_ckpt, target_dir):
 
     torch.manual_seed(1234)
     torch.cuda.manual_seed(1234)
@@ -48,6 +49,14 @@ def pipeline_span(Or_image_root, part_att_ckpt, target_dir):
 
     part_att_root = tar_dir_name
 
+    print("\n### STEP 3 : Generate foreground mask by deep generator ###")
+    checkpoint = os.path.join(mask_dl_ckpt, '5.ckpt')
+    BGRemove_DL.implement(image_root=image_root,
+                              mask_root=part_att_root,
+                              model=model.Foreground_Generator().to(device),
+                              device=device,
+                              checkpoint=checkpoint)
+
     print("\n### Generate part attention mask ###")
     checkpoint = os.path.join(part_att_ckpt, '10.ckpt')
     PartAttGen.implement(image_root=image_root,
@@ -62,6 +71,7 @@ def pipeline_span(Or_image_root, part_att_ckpt, target_dir):
 
 
 if __name__ == '__main__':
-    pipeline_span(Or_image_root="/home/fyp3/Desktop/Batch18/Re_ID/Dataset/re_id_weligama",
-                  part_att_ckpt="/home/fyp3/Desktop/Batch18/Re_ID/Dataset/part_attention_ckpt/",
-                  target_dir="/home/fyp3/Desktop/Batch18/Re_ID/")
+    pipeline_span(Or_image_root="/home/fyp3-2/Desktop/BATCH18/ReID_check/Val_data/",
+                  mask_dl_ckpt= "/home/fyp3-2/Desktop/BATCH18/FYP-SPAN/mask_dl_chckpt/",
+                  part_att_ckpt="/home/fyp3-2/Desktop/BATCH18/Grayscale_Mask_Images/part_attention_chckpt/",
+                  target_dir="/home/fyp3-2/Desktop/BATCH18/ReID_check/")
