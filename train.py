@@ -6,16 +6,10 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import model
+import model as reidmodels
 from ImageMasksDataset import ImageMasksTriplet
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# parser = argparse.ArgumentParser(description='Train Semantics-guided Part Attention Network (SPAN) pipeline', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-# parser.add_argument('--mode', required=True, help='Select training or implementation mode; option: ["train", "implement"]')
-
-img_root = "/home/fyp3-2/Desktop/BATCH18/ReID_check/train"
-mask_root = "/home/fyp3-2/Desktop/BATCH18/ReID_check/masks_train"
 
 
 class TripletLossWithCPDM(nn.Module):
@@ -51,23 +45,24 @@ class TripletLossWithCPDM(nn.Module):
         return losses.mean()
 
 
-if __name__ == '__main__':
-
+def reid_train(csv_path_train, csv_path_val,train_data_path,val_data_path, mask_path_train,mask_path_val, model=reidmodels):
     # transform = T.Compose([T.Resize([192, 192]),
     #                        T.ToTensor(),
     #                        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
-    csv_path = "/home/fyp3-2/Desktop/BATCH18/ReID_check/train_data.csv"
-    train_data_path = "/home/fyp3-2/Desktop/BATCH18/ReID_check/train"
-    mask_path = "/home/fyp3-2/Desktop/BATCH18/ReID_check/masks_train"
-
     types_dict = {'filename': str, 'id': str, 'global': float, 'front': float, 'rear': float, 'side': float}
-    dataframe = pd.read_csv(csv_path, dtype=types_dict)
-    dataframe['area_ratios'] = dataframe[['global', 'front', 'rear', 'side']].values.tolist()
+    dataframe_train = pd.read_csv(csv_path_train, dtype=types_dict)
+    dataframe_train['area_ratios'] = dataframe_train[['global', 'front', 'rear', 'side']].values.tolist()
 
-    dataset = ImageMasksTriplet(df=dataframe, image_path=train_data_path, mask_path=mask_path)
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=1)
-    # dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
+    dataframe_val = pd.read_csv(csv_path_val, dtype=types_dict)                                                  #val
+    dataframe_val['area_ratios'] = dataframe_val[['global', 'front', 'rear', 'side']].values.tolist()            #val
+
+    dataset_train = ImageMasksTriplet(df=dataframe_train, image_path=train_data_path, mask_path=mask_path_train)
+    dataloader_train = DataLoader(dataset_train, batch_size=2, shuffle=True, num_workers=1)
+
+    dataset_val = ImageMasksTriplet(df=dataframe_val, image_path=val_data_path, mask_path_train=mask_path_val)
+    dataloader_val = DataLoader(dataset_val, batch_size=2, shuffle=True, num_workers=1)
+    # dataloader_train = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
     #                         # persistent_workers=True)
 
     classifier = model.BoatIDClassifier(num_of_classes=474)
@@ -79,17 +74,24 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters(), lr=0.00001)
     epoch = 1
 
-    triplet_loss_bucket=[]
+    triplet_loss_bucket = []
     CE_loss_bucket = []
     total_loss_bucket = []
+    triplet_loss_bucket_val = []
+    CE_loss_bucket_val = []
+    total_loss_bucket_val = []
     for ep in range(epoch):
         model.train()
         print('\nStarting epoch %d / %d :' % (ep + 1, epoch))
-        pbar = tqdm(total=len(dataloader))
-        for batch_idx, data in enumerate(dataloader):
+        pbar = tqdm(total=len(dataloader_train))
+        for batch_idx, data in enumerate(dataloader_train):
             anchor_img, anchor_image_masks, anchor_area_ratios, positive_img, \
-            positive_img_masks, positive_area_ratios, negative_img, negative_img_masks, \
-            negative_area_ratios, target = data
+                positive_img_masks, positive_area_ratios, negative_img, negative_img_masks, \
+                negative_area_ratios, target = data
+
+            anchor_img_val, anchor_image_masks_val, anchor_area_ratios_val, positive_img_val, \
+                positive_img_masks_val, positive_area_ratios_val, negative_img_val, negative_img_masks_val, \
+                negative_area_ratios_val, target_val = dataloader_val[batch_idx]                                       #val
 
             anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device),
                                         anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
@@ -98,7 +100,17 @@ if __name__ == '__main__':
             negative_img_features = model(negative_img.to(device), negative_img_masks[0].to(device),
                                           negative_img_masks[1].to(device), negative_img_masks[2].to(device))
 
+            
+            anchor_img_features_val = model(anchor_img_val.to(device), anchor_image_masks_val[0].to(device),
+                                        anchor_image_masks_val[1].to(device), anchor_image_masks_val[2].to(device))
+            positive_img_features_val = model(positive_img_val.to(device), positive_img_masks_val[0].to(device),
+                                          positive_img_masks_val[1].to(device), positive_img_masks_val[2].to(device))
+            negative_img_features_val = model(negative_img_val.to(device), negative_img_masks_val[0].to(device),
+                                          negative_img_masks_val[1].to(device), negative_img_masks_val[2].to(device))         #val
+
+
             prediction = classifier(anchor_img_features)
+            prediction_val = classifier(anchor_img_features_val)                                                            #val
             criterion1 = nn.CrossEntropyLoss()
             criterion2 = TripletLossWithCPDM()
 
@@ -106,19 +118,31 @@ if __name__ == '__main__':
             triplet_loss = criterion2(anchor_img_features, anchor_area_ratios, positive_img_features,
                                       positive_area_ratios, negative_img_features, negative_area_ratios)
 
+            cross_entropy_loss_val = criterion1(prediction_val, target_val.to(device))
+            triplet_loss_val = criterion2(anchor_img_features_val, anchor_area_ratios_val, positive_img_features_val,
+                                      positive_area_ratios_val, negative_img_features_val, negative_area_ratios_val)           #val
+
             lambda_ID = 1
             lambda_triplet = 1
             loss = lambda_ID * cross_entropy_loss + lambda_triplet * triplet_loss
+            loss_val = lambda_ID * cross_entropy_loss_val + lambda_triplet * triplet_loss_val                                #val
 
             triplet_loss_bucket.append(triplet_loss)
             CE_loss_bucket.append(cross_entropy_loss)
             total_loss_bucket.append(loss)
 
+            triplet_loss_bucket_val.append(triplet_loss_val)
+            CE_loss_bucket_val.append(cross_entropy_loss_val)
+            total_loss_bucket_val.append(loss_val)
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            pbar.set_postfix({'Triplet_loss': ' {0:1.6f}'.format(triplet_loss/len(dataloader)), 'ID_loss': ' {0:1.6f}'.format(cross_entropy_loss/len(dataloader))})
+            pbar.set_postfix({'Triplet_loss_train': ' {0:1.6f}'.format(triplet_loss / len(dataloader_train)),
+                              'ID_loss_train': ' {0:1.6f}'.format(cross_entropy_loss / len(dataloader_train)),
+                              'Triplet_loss_val': ' {0:1.6f}'.format(triplet_loss_val / len(dataloader_val)),
+                              'ID_loss_val': ' {0:1.6f}'.format(cross_entropy_loss_val / len(dataloader_val))})
             pbar.update(1)
         pbar.close()
     torch.save(model, "/home/fyp3-2/Desktop/BATCH18/ReID_check/temp.pth")
