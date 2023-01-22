@@ -239,5 +239,5 @@ def CNN2(pretrained=True, num_features = 512):
 
     # Parameters of newly constructed modules have requires_grad=True by default
     flatten = nn.Flatten()
-    cnn2 = nn.Sequential(cnn2, flatten, nn.Linear(2048*12*12, num_features))
+    cnn2 = nn.Sequential(cnn2, nn.MaxPool2d(12), flatten, nn.Linear(2048, num_features))
     return cnn2

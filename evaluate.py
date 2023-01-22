@@ -50,6 +50,7 @@ def get_area_ratios(image_name, mask_root):
     return area_ratios
 
 
+
 def compare(query_mask_dir, gallery_mask_dir, query_image, query_img_features, gallery_image, gallery_img_features):
     query_area_ratios = get_area_ratios(query_image, query_mask_dir)
     gallery_area_ratios = get_area_ratios(gallery_image, gallery_mask_dir)
@@ -59,14 +60,17 @@ def compare(query_mask_dir, gallery_mask_dir, query_image, query_img_features, g
 
 
 def accuracy(query_mask_dir, gallery_mask_dir, query_images, query_images_ids, query_images_features, gallery_images, gallery_images_ids, gallery_images_features):
+
     final_accuracy1 = 0
     final_accuracy5 = 0
     final_accuracy10 = 0
     pbar = tqdm(total=len(query_images))
     for i in range(len(query_images)):
+
         distances = {}
         for j in range(len(gallery_images)):
             weighted_distance = compare(query_mask_dir, gallery_mask_dir, query_images[i], query_images_features[i], gallery_images[j], gallery_images_features[j])
+
             distances[gallery_images_ids[j] + gallery_images[j]] = weighted_distance
         sorted_distances = sorted(distances.items(), key=lambda x: x[1])
         keys = []
@@ -86,16 +90,20 @@ def accuracy(query_mask_dir, gallery_mask_dir, query_images, query_images_ids, q
         final_accuracy10 += correct_instances10
         pbar.update(1)
     pbar.close()
+
     return final_accuracy1 / len(query_images), final_accuracy5 / len(query_images), final_accuracy10 / len(query_images)
 
 
 def mAP(query_mask_dir, gallery_mask_dir, query_images, query_images_ids, query_images_features, num_of_ids, gallery_images, gallery_images_ids, gallery_images_features):
+
     total = 0
     pbar = tqdm(total=len(query_images))
     for i in range(len(query_images)):
         distances = {}
         for j in range(len(gallery_images)):
+
             weighted_distance = compare(query_mask_dir, gallery_mask_dir, query_images[i], query_images_features[i], gallery_images[j], gallery_images_features[j])
+
             distances[gallery_images_ids[j] + gallery_images[j]] = weighted_distance
         sorted_distances = sorted(distances.items(), key=lambda x: x[1])
         instances = []
@@ -122,6 +130,7 @@ def reid_evaluation(root_dir, mask_dir):
     gallery_mask_dir = mask_dir + "/gallery"
     query_images = []
     query_images_ids = []
+
     query_images_features = []
     gallery_images = []
     gallery_images_ids = []
@@ -134,6 +143,7 @@ def reid_evaluation(root_dir, mask_dir):
         if len(query_images_names) != 0:
             for i in range(len(query_images_names)):
                 if query_images_names[i][-3:] == 'jpg':
+
                     imageQueryT = img_transform(Image.open(query_dir + '/' + root[-3:] + '/' + query_images_names[i]).convert('RGB'))
                     imageQuery = torch.unsqueeze(imageQueryT, 0)
                     frontQueryT = mask_transform(Image.open(query_mask_dir + '/' + query_images_names[i][:-4] + '_front.jpg'))
@@ -164,6 +174,7 @@ def reid_evaluation(root_dir, mask_dir):
                     gallery_images.append(gallery_images_names[i])
                 gallery_images_ids.append(root[-3:])
             num_of_ids.append(len(gallery_images_names))
+
 
     print("### Calculating Accuracy ###")
     top1, top5, top10 = accuracy(query_mask_dir, gallery_mask_dir, query_images, query_images_ids, query_images_features, gallery_images, gallery_images_ids, gallery_images_features)

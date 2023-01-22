@@ -43,7 +43,8 @@ def implement(image_root, mask_root, model, device, checkpoint):
                            T.ToTensor(),
                            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
-    dirs = ['image_train', 'image_test', 'image_query']
+    #dirs = ['image_train', 'image_test', 'image_query']
+    dirs=os.listdir(image_root)
     for d in dirs:
         input_dir = os.path.join(image_root, d)
         output_dir = os.path.join(mask_root, d)
