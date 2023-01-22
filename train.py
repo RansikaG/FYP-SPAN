@@ -60,7 +60,7 @@ def reid_train(csv_path_train, csv_path_val,train_data_path,val_data_path, mask_
     dataset_train = ImageMasksTriplet(df=dataframe_train, image_path=train_data_path, mask_path=mask_path_train)
     dataloader_train = DataLoader(dataset_train, batch_size=2, shuffle=True, num_workers=1)
 
-    dataset_val = ImageMasksTriplet(df=dataframe_val, image_path=val_data_path, mask_path_train=mask_path_val)
+    dataset_val = ImageMasksTriplet(df=dataframe_val, image_path=val_data_path, mask_path=mask_path_val)
     dataloader_val = DataLoader(dataset_val, batch_size=2, shuffle=True, num_workers=1)
     # dataloader_train = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, prefetch_factor=2,
     #                         # persistent_workers=True)
