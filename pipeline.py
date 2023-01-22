@@ -33,7 +33,8 @@ if __name__ == '__main__':
     train_mask_path = args.mask_dir + '/attention_masks_gen/train'
     train.reid_train(csv_path_val='/home/fyp3-2/Desktop/BATCH18/ReID_check/val_data.csv', csv_path_train=args.train_csv_path,
                      train_data_path=train_data_path, mask_path_train=train_mask_path,
-                     mask_path_val='/home/fyp3-2/Desktop/BATCH18/ReID_check/val_attention_masks_gen/val')
+                     mask_path_val='/home/fyp3-2/Desktop/BATCH18/ReID_check/val_attention_masks_gen/val',
+                     val_data_path='/home/fyp3-2/Desktop/BATCH18/ReID_check/Val_data/val')
     train_mask_path = args.mask_dir + '/attention_masks_gen'
     print('### Evaluate ###')
     # evaluate.reid_evaluation(root_dir=args.dataset, mask_dir=train_mask_path)
