@@ -7,9 +7,6 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 
-csv_path = './test_images/identities_train/train_data.csv'
-
-train_data = pd.read_csv(csv_path)
 
 
 class ImageMasksTriplet(Dataset):
