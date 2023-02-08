@@ -89,10 +89,11 @@ def reid_train(csv_path_train, csv_path_val,train_data_path,val_data_path, mask_
             anchor_img, anchor_image_masks, anchor_area_ratios, positive_img, \
                 positive_img_masks, positive_area_ratios, negative_img, negative_img_masks, \
                 negative_area_ratios, target = data
-
+            
+            val_data=next(iter(dataloader_val))
             anchor_img_val, anchor_image_masks_val, anchor_area_ratios_val, positive_img_val, \
                 positive_img_masks_val, positive_area_ratios_val, negative_img_val, negative_img_masks_val, \
-                negative_area_ratios_val, target_val = dataloader_val[batch_idx]                                       #val
+                negative_area_ratios_val, target_val = val_data                                                     #val
 
             anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device),
                                         anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
