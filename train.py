@@ -89,8 +89,11 @@ def reid_train(csv_path_train, csv_path_val,train_data_path,val_data_path, mask_
             anchor_img, anchor_image_masks, anchor_area_ratios, positive_img, \
                 positive_img_masks, positive_area_ratios, negative_img, negative_img_masks, \
                 negative_area_ratios, target = data
-
-                                                             
+            
+            val_data=next(iter(dataloader_val))
+            anchor_img_val, anchor_image_masks_val, anchor_area_ratios_val, positive_img_val, \
+                positive_img_masks_val, positive_area_ratios_val, negative_img_val, negative_img_masks_val, \
+                negative_area_ratios_val, target_val = val_data                                                     #val
 
             anchor_img_features = model(anchor_img.to(device), anchor_image_masks[0].to(device),
                                         anchor_image_masks[1].to(device), anchor_image_masks[2].to(device))
@@ -100,10 +103,16 @@ def reid_train(csv_path_train, csv_path_val,train_data_path,val_data_path, mask_
                                           negative_img_masks[1].to(device), negative_img_masks[2].to(device))
 
             
-            
+            anchor_img_features_val = model(anchor_img_val.to(device), anchor_image_masks_val[0].to(device),
+                                        anchor_image_masks_val[1].to(device), anchor_image_masks_val[2].to(device))
+            positive_img_features_val = model(positive_img_val.to(device), positive_img_masks_val[0].to(device),
+                                          positive_img_masks_val[1].to(device), positive_img_masks_val[2].to(device))
+            negative_img_features_val = model(negative_img_val.to(device), negative_img_masks_val[0].to(device),
+                                          negative_img_masks_val[1].to(device), negative_img_masks_val[2].to(device))         #val
 
 
             prediction = classifier(anchor_img_features)
+            prediction_val = classifier(anchor_img_features_val)                                                            #val
             criterion1 = nn.CrossEntropyLoss()
             criterion2 = TripletLossWithCPDM()
 
@@ -111,48 +120,31 @@ def reid_train(csv_path_train, csv_path_val,train_data_path,val_data_path, mask_
             triplet_loss = criterion2(anchor_img_features, anchor_area_ratios, positive_img_features,
                                       positive_area_ratios, negative_img_features, negative_area_ratios)
 
-            
+            cross_entropy_loss_val = criterion1(prediction_val, target_val.to(device))
+            triplet_loss_val = criterion2(anchor_img_features_val, anchor_area_ratios_val, positive_img_features_val,
+                                      positive_area_ratios_val, negative_img_features_val, negative_area_ratios_val)           #val
 
             lambda_ID = 1
             lambda_triplet = 1
             loss = lambda_ID * cross_entropy_loss + lambda_triplet * triplet_loss
-            
+            loss_val = lambda_ID * cross_entropy_loss_val + lambda_triplet * triplet_loss_val                                #val
 
             triplet_loss_bucket.append(triplet_loss)
             CE_loss_bucket.append(cross_entropy_loss)
             total_loss_bucket.append(loss)
 
-            for batch_idx_val, data_val in enumerate(dataloader_val):
-                anchor_img_val, anchor_image_masks_val, anchor_area_ratios_val, positive_img_val, \
-                positive_img_masks_val, positive_area_ratios_val, negative_img_val, negative_img_masks_val, \
-                negative_area_ratios_val, target_val = data_val
-
-                anchor_img_features_val = model(anchor_img_val.to(device), anchor_image_masks_val[0].to(device),
-                                        anchor_image_masks_val[1].to(device), anchor_image_masks_val[2].to(device))
-                positive_img_features_val = model(positive_img_val.to(device), positive_img_masks_val[0].to(device),
-                                            positive_img_masks_val[1].to(device), positive_img_masks_val[2].to(device))
-                negative_img_features_val = model(negative_img_val.to(device), negative_img_masks_val[0].to(device),
-                                            negative_img_masks_val[1].to(device), negative_img_masks_val[2].to(device))         #val
-
-                prediction_val = classifier(anchor_img_features_val)
-                cross_entropy_loss_val = criterion1(prediction_val, target_val.to(device))
-                triplet_loss_val = criterion2(anchor_img_features_val, anchor_area_ratios_val, positive_img_features_val,
-                                        positive_area_ratios_val, negative_img_features_val, negative_area_ratios_val)           #val
-
-                loss_val = lambda_ID * cross_entropy_loss_val + lambda_triplet * triplet_loss_val                                #val
-
-                triplet_loss_bucket_val.append(triplet_loss_val)
-                CE_loss_bucket_val.append(cross_entropy_loss_val)
-                total_loss_bucket_val.append(loss_val)
+            triplet_loss_bucket_val.append(triplet_loss_val)
+            CE_loss_bucket_val.append(cross_entropy_loss_val)
+            total_loss_bucket_val.append(loss_val)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            pbar.set_postfix({'Triplet_loss_train': ' {0:1.6f}'.format(triplet_loss / len(dataloader_train)),
-                              'ID_loss_train': ' {0:1.6f}'.format(cross_entropy_loss / len(dataloader_train)),
-                              'Triplet_loss_val': ' {0:1.6f}'.format(triplet_loss_val / len(dataloader_val)),
-                              'ID_loss_val': ' {0:1.6f}'.format(cross_entropy_loss_val / len(dataloader_val))})
+            pbar.set_postfix({'Triplet_loss_train': ' {0:1.6f}'.format(triplet_loss / len(data)),
+                              'ID_loss_train': ' {0:1.6f}'.format(cross_entropy_loss / len(data)),
+                              'Triplet_loss_val': ' {0:1.6f}'.format(triplet_loss_val / len(val_data)),
+                              'ID_loss_val': ' {0:1.6f}'.format(cross_entropy_loss_val / len(val_data))})
             pbar.update(1)
         pbar.close()
     torch.save(model, "/home/fyp3-2/Desktop/BATCH18/ReID_check/temp.pth")
