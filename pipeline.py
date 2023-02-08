@@ -37,4 +37,4 @@ if __name__ == '__main__':
                      val_data_path='/home/fyp3-2/Desktop/BATCH18/ReID_check/Val_data/val')
     train_mask_path = args.mask_dir + '/attention_masks_gen'
     print('### Evaluate ###')
-    # evaluate.reid_evaluation(root_dir=args.dataset, mask_dir=train_mask_path)
+    #evaluate.reid_evaluation(root_dir=args.dataset, mask_dir=train_mask_path)
