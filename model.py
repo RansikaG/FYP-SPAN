@@ -57,26 +57,55 @@ class PartAtt_Generator(nn.Module):
 class Foreground_Generator(nn.Module):
     def __init__(self):
         super(Foreground_Generator, self).__init__()
-        self.extractor = resnet34()
-        nc, nz, ngf = 1, 256, 64
-        self.generator = nn.Sequential(
-            # input is Z, going into a convolution
-            # state size. nz x 24 x 24
-            nn.ConvTranspose2d(nz, ngf * 2, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
-            # state size. (ngf*2) x 27 x 27
-            nn.ConvTranspose2d(ngf * 2, ngf, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
-            # state size. (ngf) x 30 x 30
-            nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
-            nn.Sigmoid()
-            # state size. (nc) x 60 x 60
-        )
+        nz, ngf = 3, 16
+        self.block1 = nn.Sequential(
+            nn.Conv2d(in_channels=nz, out_channels=ngf , kernel_size=3, stride=1, padding="same"),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=ngf,out_channels= ngf//2 , kernel_size=9, stride=1, padding="same"),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.ReLU(True))
+        
+        self.block2 = nn.Sequential(
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(in_channels=8,out_channels= 8 , kernel_size=15, stride=1, padding='same'),
+            nn.ReLU())
+        
+        self.block3 = nn.Sequential(
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(in_channels=8,out_channels= 4 , kernel_size=19, stride=1, padding='same'),
+            nn.ReLU())
+        
+        self.block3_b = nn.Sequential(
+            nn.MaxPool2d(kernel_size=2))
+        
+        ###############################################
+        
+        self.block4 = nn.Sequential(           
+            nn.Conv2d(in_channels=4, out_channels=4 , kernel_size=19, stride=1, padding='same'),
+            nn.ReLU(),
+            nn.UpsamplingBilinear2d(scale_factor=2))
+        
+        self.block5 = nn.Sequential(           
+            nn.Conv2d(in_channels=4, out_channels=8 , kernel_size=15, stride=1, padding='same'),
+            nn.ReLU(),
+            nn.UpsamplingBilinear2d(scale_factor=2))
+        
+        self.block6 = nn.Sequential(           
+            nn.Conv2d(in_channels=8,out_channels= 8 , kernel_size=9, stride=1, padding='same'),
+            nn.ReLU(),
+            nn.UpsamplingBilinear2d(scale_factor=2))
+        
+        self.block7 = nn.Sequential(           
+            nn.Conv2d(in_channels=8, out_channels=8 , kernel_size=5, stride=1, padding='same'),
+            nn.Tanh(),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+            nn.Conv2d(in_channels=8, out_channels=1 , kernel_size=3, stride=1, padding='same'),
+            nn.Sigmoid())
+        
 
         for m in self.modules():
-            if isinstance(m, nn.ConvTranspose2d):
+            if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
             elif isinstance(m, nn.BatchNorm2d):
@@ -84,10 +113,19 @@ class Foreground_Generator(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        x = self.extractor(x, 3)
-        x = self.generator(x)
-        x = x.view(-1, 60, 60)
-        return x
+        res1 = self.block1(x)
+        res2 = self.block2(res1)
+        res3 = self.block3(res2)
+        x=self.block3_b(res3)
+        out=self.block4(x)
+        out+=res3
+        out2=self.block5(out)
+        out2+=res2
+        out3=self.block6(out2)
+        out3+=res1
+        res=self.block7(out3)
+        res=res.view(-1,192,192)
+        return res
 
 
 class Second_Stage_Extractor(nn.Module):

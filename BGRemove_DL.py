@@ -9,6 +9,7 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 import glob, os, cv2
+from torchsummary import summary
 
 class VeRI(Dataset):
     def __init__(self, image_root, mask_root=None, transform=None):
@@ -27,7 +28,7 @@ class VeRI(Dataset):
             return image, self.filenames[index]
         else: # Training mode
             mask = Image.open(self.filenames[index].replace(self.image_root, self.mask_root))
-            mask = np.array(mask.resize((60,60)))
+            mask = np.array(mask.resize((192,192)))
             mask = torch.from_numpy(mask/255).float()
             return image, mask
 
@@ -40,8 +41,7 @@ def implement(image_root, mask_root, model, device, checkpoint):
     print('model loaded from %s' % checkpoint)
 
     transform = T.Compose([T.Resize([192,192]),
-                           T.ToTensor(),
-                           T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+                           T.ToTensor()])
 
     #dirs = ['image_train', 'image_test', 'image_query']
     dirs=os.listdir(image_root)
@@ -51,7 +51,7 @@ def implement(image_root, mask_root, model, device, checkpoint):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         dataset = VeRI(image_root=input_dir, transform=transform)
-        dataloader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=4)
+        dataloader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=1)
         print('start processing the images in %s (totally %i images)'%(input_dir, len(dataset)))
         print('generated foreground mask would be stored in %s'%output_dir)
 
@@ -66,7 +66,7 @@ def implement(image_root, mask_root, model, device, checkpoint):
             pbar.close()
     
 def close_huge_loss(predict, target):
-    loss = ((predict-target)**2).view(-1,60*60)
+    loss = ((predict-target)**2).view(-1,192*192)
     loss = torch.sum(loss, 1)
     topk = torch.topk(loss, int(predict.shape[0]/2))[1]
     for idx in topk:
@@ -74,10 +74,13 @@ def close_huge_loss(predict, target):
         target[idx][predict[idx] <= 0.5] = 0
     return target
 
-def train(image_root, mask_root, model, device, checkpoint_path, epoch=5):
+def train(image_root, mask_root, model, device, checkpoint_path, epoch=100):
+    # transform = T.Compose([T.Resize([192,192]),
+    #                        T.ToTensor(),
+    #                        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+
     transform = T.Compose([T.Resize([192,192]),
-                           T.ToTensor(),
-                           T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+                           T.ToTensor()])
     trainset = VeRI(image_root=os.path.join(image_root, 'image_train'),
                     mask_root=os.path.join(mask_root, 'image_train'),
                     transform=transform)
@@ -86,13 +89,17 @@ def train(image_root, mask_root, model, device, checkpoint_path, epoch=5):
                     transform=transform)
     print('# images in training dataset: %i'%len(trainset))
     print('# images in valid dataset: %i'%len(validset))
-    trainloader = DataLoader(trainset, batch_size=32, shuffle=True, num_workers=4)
-    validloader = DataLoader(validset, batch_size=30, shuffle=False, num_workers=4)
+    #print(trainset.shape)
+    trainloader = DataLoader(trainset, batch_size=128, shuffle=True, num_workers=1)
+    validloader = DataLoader(validset, batch_size=32, shuffle=False, num_workers=1)
     if not os.path.exists(checkpoint_path):
         os.makedirs(checkpoint_path)
 
-    optimizer = optim.Adam(model.parameters(), lr = 0.0001)
-    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr = 0.0005)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,60,90], gamma=0.5)
+    criterion = nn.L1Loss()
+    #print(summary(model,(3,3,3)))
+
 
     for ep in range(epoch):
         model.train()  # Important: set training mode
@@ -101,9 +108,10 @@ def train(image_root, mask_root, model, device, checkpoint_path, epoch=5):
         pbar = tqdm(total=len(trainloader))
         for batch_idx, (data, target) in enumerate(trainloader):
             data, target = data.to(device), target.to(device)
+            
             predict = model(data)
-            if ep >= 3:
-                target = close_huge_loss(predict, target)
+            #if ep >= 3:
+            #    target = close_huge_loss(predict, target)
             loss = criterion(predict, target)
             train_loss += loss.item()
 
@@ -113,7 +121,8 @@ def train(image_root, mask_root, model, device, checkpoint_path, epoch=5):
 
             pbar.set_postfix({'loss':' {0:1.3f}'.format(train_loss/(batch_idx+1))})
             pbar.update(1)
-        pbar.close()           
+        pbar.close()
+        scheduler.step()           
         
         evaluation(validloader, model, device, checkpoint_path, ep)
         model_name = os.path.join(checkpoint_path, '%i.ckpt'%(ep+1))
@@ -121,12 +130,12 @@ def train(image_root, mask_root, model, device, checkpoint_path, epoch=5):
         print('model saved as %s' % model_name)
 
 def evaluation(validloader, model, device, checkpoint_path, epoch):
-    inv = T.Compose([T.Normalize(mean=[0.,0.,0.], std=[1/0.229,1/0.224,1/0.225]),
-                     T.Normalize(mean=[-0.485,-0.456,-0.406 ], std=[1.,1.,1.])])
+    inv = T.Compose([T.Resize([192,192])])
 
     with torch.no_grad():
         dataiter = iter(validloader)
-        data, target = dataiter.next()
+        data, target = next(dataiter)
+        #data, target = dataiter.next() 
         data, target = data.to(device), target.to(device)
         predict = model(data)
         
