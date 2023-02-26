@@ -141,10 +141,10 @@ def reid_train(csv_path_train, csv_path_val,train_data_path,val_data_path, mask_
             loss.backward()
             optimizer.step()
 
-            pbar.set_postfix({'Triplet_loss_train': ' {0:1.6f}'.format(triplet_loss / len(dataloader_train)),
-                              'ID_loss_train': ' {0:1.6f}'.format(cross_entropy_loss / len(dataloader_train)),
-                              'Triplet_loss_val': ' {0:1.6f}'.format(triplet_loss_val / len(dataloader_val)),
-                              'ID_loss_val': ' {0:1.6f}'.format(cross_entropy_loss_val / len(dataloader_val))})
+            pbar.set_postfix({'Triplet_loss_train': ' {0:1.6f}'.format(triplet_loss / len(data)),
+                              'ID_loss_train': ' {0:1.6f}'.format(cross_entropy_loss / len(data)),
+                              'Triplet_loss_val': ' {0:1.6f}'.format(triplet_loss_val / len(val_data)),
+                              'ID_loss_val': ' {0:1.6f}'.format(cross_entropy_loss_val / len(val_data))})
             pbar.update(1)
         pbar.close()
     torch.save(model, "/home/fyp3-2/Desktop/BATCH18/ReID_check/temp.pth")
