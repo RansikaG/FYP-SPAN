@@ -90,7 +90,7 @@ def train(image_root, mask_root, model, device, checkpoint_path, epoch=100):
     print('# images in training dataset: %i'%len(trainset))
     print('# images in valid dataset: %i'%len(validset))
     #print(trainset.shape)
-    trainloader = DataLoader(trainset, batch_size=128, shuffle=True, num_workers=1)
+    trainloader = DataLoader(trainset, batch_size=128, shuffle=False, num_workers=1)
     validloader = DataLoader(validset, batch_size=32, shuffle=False, num_workers=1)
     if not os.path.exists(checkpoint_path):
         os.makedirs(checkpoint_path)

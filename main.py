@@ -47,7 +47,7 @@ if __name__ == '__main__':
                           epoch=100)
 
         print("\n### STEP 3 : Generate foreground mask by deep generator ###")
-        checkpoint = os.path.join(args.mask_dl_ckpt, '5.ckpt')
+        checkpoint = os.path.join(args.mask_dl_ckpt, '100.ckpt')
         BGRemove_DL.implement(image_root=args.image_root,
                               mask_root=args.mask_dl_root,
                               model=model.Foreground_Generator().to(device),
