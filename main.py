@@ -34,20 +34,20 @@ if __name__ == '__main__':
 
     if args.mode == 'train':
         print("\n### STEP 1 : Generate foreground mask by GrabCut ###")
-        BGRemove_GrabCut.implement(image_root=args.image_root,
-                                   mask_root=args.mask_grabcut_root)
+        # BGRemove_GrabCut.implement(image_root=args.image_root,
+        #                            mask_root=args.mask_grabcut_root)
         #visualize(image_root=args.image_root, foreground_grabcut_root=args.mask_grabcut_root)
 
         print("\n### STEP 2 : Train foreground mask generator ###")
-        BGRemove_DL.train(image_root=args.image_root,
-                          mask_root=args.mask_grabcut_root,
-                          model=model.Foreground_Generator().to(device),
-                          device=device,
-                          checkpoint_path=args.mask_dl_ckpt,
-                          epoch=5)
+        # BGRemove_DL.train(image_root=args.image_root,
+        #                   mask_root=args.mask_grabcut_root,
+        #                   model=model.Foreground_Generator().to(device),
+        #                   device=device,
+        #                   checkpoint_path=args.mask_dl_ckpt,
+        #                   epoch=100)
 
         print("\n### STEP 3 : Generate foreground mask by deep generator ###")
-        checkpoint = os.path.join(args.mask_dl_ckpt, '5.ckpt')
+        checkpoint = os.path.join(args.mask_dl_ckpt, '100.ckpt')
         BGRemove_DL.implement(image_root=args.image_root,
                               mask_root=args.mask_dl_root,
                               model=model.Foreground_Generator().to(device),
@@ -56,13 +56,13 @@ if __name__ == '__main__':
         #visualize(image_root=args.image_root, foreground_grabcut_root=args.mask_grabcut_root, foreground_dl_root=args.mask_dl_root)
 
         print("\n### STEP 4 : Train part attention mask generator ###")
-        PartAttGen.train(image_root=args.image_root,
-                         mask_root=args.mask_dl_root,
-                         csv_file=args.dataset_csv,
-                         model=model.PartAtt_Generator().to(device),
-                         device=device,
-                         checkpoint_path=args.part_att_ckpt,
-                         epoch=10)
+        # PartAttGen.train(image_root=args.image_root,
+        #                  mask_root=args.mask_dl_root,
+        #                  csv_file=args.dataset_csv,
+        #                  model=model.PartAtt_Generator().to(device),
+        #                  device=device,
+        #                  checkpoint_path=args.part_att_ckpt,
+        #                  epoch=10)
 
         print("\n### STEP 5 : Generate part attention mask ###")
         checkpoint = os.path.join(args.part_att_ckpt, '10.ckpt')
@@ -73,10 +73,10 @@ if __name__ == '__main__':
                              checkpoint=checkpoint)
 
         print("\n### STEP 6 : Visualization ###")
-        visualize(image_root=args.image_root,
-                  foreground_grabcut_root=args.mask_grabcut_root,
-                  foreground_dl_root=args.mask_dl_root,
-                  partmask_root=args.part_att_root)
+        # visualize(image_root=args.image_root,
+        #           foreground_grabcut_root=args.mask_grabcut_root,
+        #           foreground_dl_root=args.mask_dl_root,
+        #           partmask_root=args.part_att_root)
 
     elif args.mode == 'implement':
         print("\n### Generate part attention mask ###")
@@ -88,8 +88,8 @@ if __name__ == '__main__':
                              checkpoint=checkpoint)
         
         print("\n### Visualization ###")
-        visualize(image_root=args.image_root,
-                  partmask_root=args.part_att_root)
+        # visualize(image_root=args.image_root,
+        #           partmask_root=args.part_att_root)
     
     else:
         print("Unsupported mode selection\nOption: ['train', 'implement']")

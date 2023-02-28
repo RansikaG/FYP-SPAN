@@ -3,7 +3,7 @@ import torch.nn as nn
 import math
 from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
-__all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']
+__all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'CNN1', 'CNN2']
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -121,7 +121,7 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
-        #self.maxpool = nn.MaxPool2d(kernel_size=2, stride=None, padding=0)
+        # self.maxpool = nn.MaxPool2d(kernel_size=2, stride=None, padding=0)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
@@ -152,11 +152,10 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-
     def forward(self, x, layer=4):
         x = self.conv1(x)
         x = self.bn1(x)
-        #x = self.maxpool(x)
+        # x = self.maxpool(x)
 
         x1 = self.layer1(x)
         if layer == 1:
@@ -179,7 +178,8 @@ class ResNet(nn.Module):
         for i in param_dict:
             if 'fc' in i:
                 continue
-            self.state_dict()[i.replace('module.','')].copy_(param_dict[i])
+            self.state_dict()[i.replace('module.', '')].copy_(param_dict[i])
+
 
 def resnet18(pretrained=True):
     model = ResNet(BasicBlock, [2, 2, 2, 2])
@@ -187,11 +187,13 @@ def resnet18(pretrained=True):
         model.load_param(load_state_dict_from_url(model_urls['resnet18']))
     return model
 
+
 def resnet34(pretrained=True):
     model = ResNet(BasicBlock, [3, 4, 6, 3])
     if pretrained:
         model.load_param(load_state_dict_from_url(model_urls['resnet34']))
     return model
+
 
 def resnet50(pretrained=True):
     model = ResNet(Bottleneck, [3, 4, 6, 3])
@@ -199,14 +201,43 @@ def resnet50(pretrained=True):
         model.load_param(load_state_dict_from_url(model_urls['resnet50']))
     return model
 
+
 def resnet101(pretrained=True):
     model = ResNet(Bottleneck, [3, 4, 23, 3])
     if pretrained:
         model.load_param(load_state_dict_from_url(model_urls['resnet101']))
     return model
 
+
 def resnet152(pretrained=True):
     model = ResNet(Bottleneck, [3, 8, 36, 3])
     if pretrained:
         model.load_param(load_state_dict_from_url(model_urls['resnet152']))
     return model
+
+
+def CNN1(pretrained=True):
+    model = ResNet(Bottleneck, [3, 4, 6, 3])
+    if pretrained:
+        model.load_param(load_state_dict_from_url(model_urls['resnet50']))
+    cnn1 = nn.Sequential(*list(model.children())[:-1])
+
+    for param in cnn1.parameters():
+        param.requires_grad = False
+
+    return cnn1
+
+
+def CNN2(pretrained=True, num_features = 512):
+    model = ResNet(Bottleneck, [3, 4, 6, 3])
+    if pretrained:
+        model.load_param(load_state_dict_from_url(model_urls['resnet50']))
+    cnn2 = nn.Sequential(*list(model.children())[-1:])
+
+    for param in cnn2.parameters():
+        param.requires_grad = False
+
+    # Parameters of newly constructed modules have requires_grad=True by default
+    flatten = nn.Flatten()
+    cnn2 = nn.Sequential(cnn2, nn.MaxPool2d(12), flatten, nn.Linear(2048, num_features))
+    return cnn2
