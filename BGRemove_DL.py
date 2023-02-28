@@ -135,7 +135,9 @@ def evaluation(validloader, model, device, checkpoint_path, epoch):
     with torch.no_grad():
         dataiter = iter(validloader)
         data, target = next(dataiter)
+
         #data, target = dataiter.next() 
+
         data, target = data.to(device), target.to(device)
         predict = model(data)
         
