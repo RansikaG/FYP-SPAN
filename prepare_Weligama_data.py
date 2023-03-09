@@ -16,11 +16,12 @@ for i, boat in enumerate(boat_folders):
     os.rename(os.path.join(data_path, boat), os.path.join(data_path, num))
     new_boat_names.append(num)
 
+train_split = 0.2
+random.shuffle(new_boat_names)
+index_range = int(len(new_boat_names) * train_split)
+train_boats = new_boat_names[index_range + 1:]
+test_boats = new_boat_names[:index_range]
 
-def split_data(new_boat_names, train_split=0.2):
-    random.shuffle(new_boat_names)
-    index_range = int(len(new_boat_names) * train_split)
-    train_boats = new_boat_names[index_range + 1:]
-    test_boats = new_boat_names[:index_range]
+os.mkdir('/home/fyp3-2/Desktop/BATCH18/Weligama_data/reid/train')
+for boat in new_boat_names:
 
-    os.mkdir('/home/fyp3-2/Desktop/BATCH18/Weligama_data/')
